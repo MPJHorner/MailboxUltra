@@ -1,0 +1,39 @@
+# Codecov configuration. The badge in the README reflects what's reported here.
+#
+# We exclude four files from coverage on purpose. Each file's own header
+# comment explains why; the short version:
+#
+# - src/main.rs        -- binary entry point. Exercised end-to-end by the
+#                         integration tests via `app::start`.
+# - src/assets.rs      -- a single `derive(RustEmbed)` declaration. Covered
+#                         implicitly by every test that serves a static asset.
+# - src/update.rs      -- the `--update` self-update flow makes real GitHub API
+#                         calls. Pure logic (parse_semver, is_newer) is
+#                         unit-tested directly; network paths are excluded.
+# - src/entrypoint.rs  -- the top-level `run()`, signal-handling
+#                         `wait_for_shutdown`, network update-check spawn, and
+#                         `open_browser` subprocess. None of these can be
+#                         deterministically driven from a unit test runner.
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: false
+    patch:
+      default:
+        target: 90%
+        threshold: 5%
+
+ignore:
+  - "src/main.rs"
+  - "src/assets.rs"
+  - "src/update.rs"
+  - "src/entrypoint.rs"
+
+comment:
+  layout: "diff, flags, files"
+  behavior: default
+  require_changes: false

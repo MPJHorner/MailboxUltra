@@ -1,0 +1,62 @@
+[package]
+name = "mailbox-ultra"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Local SMTP fake inbox with a live web UI. Catch every message your app sends without ever delivering one."
+authors = ["MPJHorner <matt@heyjodie.com>"]
+license = "MIT"
+repository = "https://github.com/MPJHorner/MailboxUltra"
+homepage = "https://github.com/MPJHorner/MailboxUltra"
+readme = "README.md"
+keywords = ["smtp", "email", "mailpit", "mailhog", "developer-tools"]
+categories = ["command-line-utilities", "development-tools::debugging", "email"]
+
+[lib]
+name = "mailbox_ultra"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mailbox-ultra"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.8", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1"
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+owo-colors = { version = "4", features = ["supports-colors"] }
+humansize = "2"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+base64 = "0.22"
+mail-parser = "0.9"
+self_update = { version = "0.44", default-features = false, features = ["reqwest", "rustls", "archive-tar", "archive-zip", "compression-flate2"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+url = "2"
+addr = "0.15"
+
+[dev-dependencies]
+tokio-test = "0.4"
+pretty_assertions = "1"
+serial_test = "3"
+eventsource-client = "0.13"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "tokio1", "tokio1-rustls-tls", "builder"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

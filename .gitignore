@@ -1,0 +1,14 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~
+lcov.info
+*.profraw
+*.profdata
+site/dist/
+site/node_modules/

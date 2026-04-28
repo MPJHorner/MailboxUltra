@@ -1,0 +1,39 @@
+<footer class="footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="0 0 32 32" width="20" height="20" aria-hidden="true">
+          <defs><linearGradient id="footg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>
+          <rect width="32" height="32" rx="7" fill="url(#footg)" opacity=".18"/>
+          <path d="M6 11 L26 11 L26 22 L6 22 Z M6 11 L16 18 L26 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">MailBox Ultra</span>
+      </div>
+      <p class="footer-tag">Local SMTP fake inbox for developers.</p>
+      <p class="footer-meta">MIT licensed. Built in Rust. Runs on your machine.</p>
+    </div>
+
+    <nav class="footer-nav" aria-label="Documentation">
+      <h4>Docs</h4>
+      <ul>
+        {{footer_links}}
+      </ul>
+    </nav>
+
+    <nav class="footer-nav" aria-label="Project">
+      <h4>Project</h4>
+      <ul>
+        <li><a href="{{repo}}" rel="noopener noreferrer">GitHub</a></li>
+        <li><a href="{{repo}}/releases/latest" rel="noopener noreferrer">Latest release</a></li>
+        <li><a href="{{repo}}/issues" rel="noopener noreferrer">Issues</a></li>
+        <li><a href="{{base}}/changelog.xml">Changelog RSS</a></li>
+        <li><a href="{{repo}}/blob/main/LICENSE" rel="noopener noreferrer">License</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="footer-bottom">
+    <span>© {{year}} MPJHorner</span>
+    <span class="dot">·</span>
+    <a href="{{repo}}" rel="noopener noreferrer">github.com/MPJHorner/MailboxUltra</a>
+  </div>
+</footer>

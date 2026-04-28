@@ -1,0 +1,73 @@
+MailBox Ultra runs a real SMTP server on a port you choose, parses every message that lands on it, and shows the result in a live web UI. Nothing is delivered. Optional --relay turns it into a transparent relay that captures the message and then hands it off to a real upstream MTA. Optional --log-file appends every captured message as one JSON object per line so you can tail it from a script or an AI assistant.
+
+Usage: mailbox-ultra [OPTIONS]
+
+Options:
+  -s, --smtp-port <SMTP_PORT>
+          Port the SMTP server listens on. Point your sender here
+          
+          [default: 1025]
+
+  -u, --ui-port <UI_PORT>
+          Port the web UI listens on
+          
+          [default: 8025]
+
+      --bind <BIND>
+          Bind address for both servers
+          
+          [default: 127.0.0.1]
+
+      --hostname <HOSTNAME>
+          Hostname announced in the SMTP banner and EHLO response
+          
+          [default: MailBoxUltra]
+
+      --max-message-size <MAX_MESSAGE_SIZE>
+          Maximum SMTP message size in bytes. Larger DATA payloads are rejected
+          
+          [default: 26214400]
+
+      --buffer-size <BUFFER_SIZE>
+          Number of messages to keep in memory
+          
+          [default: 1000]
+
+      --no-ui
+          Disable the web UI server entirely
+
+      --no-cli
+          Disable the colored CLI output
+
+      --json
+          Emit each captured message as JSON (NDJSON) to stdout
+
+      --open
+          Open the web UI in your browser on startup
+
+  -v, --verbose
+          Verbose CLI output: prints recipients, headers, and a body preview for each message
+
+      --update
+          Download the latest release from GitHub and replace this binary, then exit
+
+      --no-update-check
+          Skip the startup check that asks GitHub if a newer release is available
+
+      --auth <USER:PASS>
+          Require AUTH PLAIN / AUTH LOGIN with the given USER:PASS credentials. Without this flag the server accepts any client. Useful when your sender will not connect unless authentication is offered
+
+      --relay <URL>
+          Relay each captured message to an upstream SMTP URL after capturing it. Format: smtp://host:port or smtps://host:port. Path/query are ignored. Userinfo (smtp://user:pass@host) is used as AUTH PLAIN credentials
+
+      --relay-insecure
+          Skip TLS certificate verification when relaying upstream (dev/staging only)
+
+      --log-file <FILE>
+          Append every captured message to FILE as one JSON object per line (NDJSON). The file is created if missing and never truncated. Useful when pairing with --relay to give an AI assistant or other tool a tail-able feed of messages as they arrive
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

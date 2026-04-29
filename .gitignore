@@ -16,3 +16,7 @@ site/node_modules/
 # Icon iconset is regenerated from icon.svg by `make icon`; only the
 # compiled .icns and the runtime PNG are committed.
 icon/AppIcon.iconset/
+
+# Python bytecode cache from running scripts/simulate.py
+__pycache__/
+*.pyc

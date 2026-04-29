@@ -109,3 +109,21 @@ dmg-arm: ## Package the Apple Silicon .app into a DMG
 .PHONY: dmg-x86
 dmg-x86: ## Package the Intel .app into a DMG
 	./mac/build-dmg.sh x86_64-apple-darwin
+
+# ---- dev: simulate inbound mail ----
+
+.PHONY: simulate
+simulate: ## Fire every realistic scenario at the running app once
+	./scripts/simulate.py
+
+.PHONY: simulate-list
+simulate-list: ## List the scenarios in scripts/simulate.py
+	./scripts/simulate.py --list
+
+.PHONY: simulate-burst
+simulate-burst: ## Fire 200 throwaway messages to test the ring buffer
+	./scripts/simulate.py burst -n 200
+
+.PHONY: simulate-all
+simulate-all: ## Run every scenario including burst
+	./scripts/simulate.py --all

@@ -86,6 +86,36 @@ Click **Apply** and the relevant servers restart in place. Captured messages are
 | `?` | Show shortcuts cheat sheet |
 | `Esc` | Close dialog / blur search |
 
+## Development
+
+Working on the app itself? Three flows cover most of it:
+
+```sh
+# 1. iterate on the code with cargo run (debug, no .app bundle)
+make run
+
+# 2. build a release .app bundle and launch it like a real Mac install
+make app
+open target/aarch64-apple-darwin/release/MailBoxUltra.app
+
+# 3. fire varied real-world-looking emails at the running app
+./scripts/simulate.py            # all scenarios except burst
+./scripts/simulate.py receipt    # one scenario
+./scripts/simulate.py burst -n 200   # ring-buffer stress test
+make simulate                    # convenience wrapper
+make simulate-list               # show every scenario
+```
+
+`scripts/simulate.py` is stdlib-only Python 3.9+ (already on macOS) so it
+works on a fresh checkout — no `pip install` step. See
+[`scripts/README.md`](scripts/README.md) for the full scenario list (HTML
+transactional, marketing, attachments, calendar invites, dark-mode aware
+HTML, RFC 2047 encoded subjects, multi-recipient, burst, etc).
+
+`make check` runs the full pre-commit gate (`cargo fmt --check`, `cargo
+clippy --all-targets --all-features -- -D warnings`, `cargo test
+--all-features`) — the same thing CI runs.
+
 ## License
 
 [MIT](LICENSE) © 2026 MPJHorner.

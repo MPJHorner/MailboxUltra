@@ -63,6 +63,13 @@ Run `make coverage` for a summary, `make coverage-html` for a per-line report. N
 - README leads with the SEO-friendly description and screenshot, then a tight Install / Quick Start / Configuration / Shortcuts flow.
 - README badges always point at `releases/latest`, so they update automatically when a new tag ships.
 
+## How to run while developing
+
+- `make run` — `cargo run` debug build. Fastest iteration, no .app shell.
+- `make app && open target/aarch64-apple-darwin/release/MailBoxUltra.app` — build a real .app bundle and launch it like a Mac install. Tests dock-icon, window persistence, WKWebView attachment.
+- `./scripts/simulate.py` — fires every realistic scenario at the running app (transactional, marketing, attachments, calendar invite, unicode, dark-mode-aware HTML, …). `--list` shows them all. `burst -n 200` for ring-buffer stress tests. Stdlib only.
+- `make check` — pre-commit gate (fmt, clippy, tests). Same thing CI runs.
+
 ## macOS bundling
 
 - `make icon` regenerates `icon/AppIcon.icns` from `icon/icon.svg`. The `.icns` is committed; rerun the target only when the SVG changes.

@@ -66,7 +66,6 @@ pub struct DetailContext<'a> {
     pub toasts: &'a mut ToastList,
     #[cfg(target_os = "macos")]
     pub native_html: Option<&'a super::native_html::NativeHtmlView>,
-    pub window_height: f32,
 }
 
 pub fn render(

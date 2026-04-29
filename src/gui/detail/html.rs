@@ -152,7 +152,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut HtmlState, m: &Message, ctx: &mut D
                             egui::StrokeKind::Inside,
                         );
                     }
-                    view.set_frame(ctx.window_height, frame);
+                    view.set_frame(frame);
                     view.set_visible(true);
                     view.load(m.id, html);
                     return;

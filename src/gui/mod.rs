@@ -6,6 +6,7 @@
 //! Relay / Help windows (Phase 7) build on this skeleton.
 
 pub mod detail;
+pub mod fonts;
 pub mod help_window;
 pub mod inbox;
 #[cfg(target_os = "macos")]
@@ -61,6 +62,7 @@ pub struct MailboxApp {
 impl MailboxApp {
     pub fn new(server: Arc<ServerHandle>, cc: &eframe::CreationContext<'_>) -> Self {
         let settings = server.settings();
+        fonts::install(&cc.egui_ctx);
         theme::apply(&cc.egui_ctx, settings.theme);
         let subscription = StoreSubscription::new(
             server.clone(),
@@ -294,14 +296,12 @@ impl eframe::App for MailboxApp {
             .and_then(|id| self.list_snapshot.iter().find(|m| m.id == id).cloned());
         let server = self.server.clone();
         let mut toasts = std::mem::take(&mut self.toasts);
-        let window_height = ctx.content_rect().height();
         #[cfg(target_os = "macos")]
         let native_html = self.native_html.as_ref();
         egui::CentralPanel::default().show_inside(ui, |ui| {
             let mut dctx = DetailContext {
                 server: &server,
                 toasts: &mut toasts,
-                window_height,
                 #[cfg(target_os = "macos")]
                 native_html,
             };

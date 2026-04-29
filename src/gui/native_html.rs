@@ -34,6 +34,11 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 /// the eframe window's contentView the first time `attach()` succeeds.
 pub struct NativeHtmlView {
     web: Retained<WKWebView>,
+    /// Retained handle to the contentView the WKWebView is a subview of.
+    /// We keep it so we can ask its current frame for the y-flip on every
+    /// `set_frame`, instead of relying on egui's idea of the window size
+    /// (which excludes panels and gives the wrong basis for AppKit coords).
+    parent: Retained<NSView>,
     delegate: Retained<MBUNavDelegate>,
     last_loaded: Cell<Option<uuid::Uuid>>,
     last_visible: Cell<bool>,
@@ -94,6 +99,7 @@ impl NativeHtmlView {
 
         Some(Self {
             web,
+            parent: parent_view,
             delegate,
             last_loaded: Cell::new(None),
             last_visible: Cell::new(false),
@@ -112,15 +118,19 @@ impl NativeHtmlView {
     }
 
     /// Reposition the web view to overlap the egui rect that was reserved
-    /// for the HTML preview. egui uses top-left point coordinates; AppKit
-    /// uses bottom-left. `window_height` is the height of the parent view
-    /// in points and is used to flip the Y axis.
-    pub fn set_frame(&self, window_height_points: f32, rect: egui::Rect) {
+    /// for the HTML preview. The egui rect is in top-left points relative
+    /// to the eframe drawing surface; the WKWebView's frame is in
+    /// bottom-left points relative to the parent NSView (the NSWindow's
+    /// contentView). We ask the parent for its actual height every call
+    /// because the window is resizable and egui's `content_rect` excludes
+    /// drawn panels — which would shift the WKWebView up by the toolbar
+    /// height and let it cover the tabs.
+    pub fn set_frame(&self, rect: egui::Rect) {
+        let parent_h: CGFloat = self.parent.frame().size.height;
         let x = rect.left() as CGFloat;
         let w = rect.width() as CGFloat;
         let h = rect.height() as CGFloat;
-        // egui top → AppKit bottom: y_flipped = window_height - rect.bottom
-        let y = (window_height_points - rect.bottom()) as CGFloat;
+        let y = parent_h - rect.bottom() as CGFloat;
         let origin = NSPoint::new(x, y);
         let size = NSSize::new(w.max(0.0), h.max(0.0));
         self.web.setFrame(NSRect::new(origin, size));

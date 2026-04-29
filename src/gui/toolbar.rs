@@ -32,6 +32,12 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     let accent = theme::accent(ui.ctx());
 
     ui.horizontal_centered(|ui| {
+        // Leave room for the macOS traffic-light buttons (close / minimise /
+        // maximise) so they don't overlap the brand. ~76px is the standard
+        // width of the trio plus a small breathing buffer.
+        #[cfg(target_os = "macos")]
+        ui.add_space(78.0);
+        #[cfg(not(target_os = "macos"))]
         ui.add_space(8.0);
         // Brand mark + name + version.
         ui.label(RichText::new("✉").size(18.0).color(accent));

@@ -98,21 +98,17 @@ pub fn render(
         return;
     };
 
-    // Fixed chrome region at the top of the central panel: header + tabs.
-    // Uses the central panel's own fill so it visually blends with the body.
-    egui::Panel::top("detail-chrome")
-        .resizable(false)
-        .frame(
-            egui::Frame::default()
-                .fill(ui.style().visuals.window_fill)
-                .inner_margin(egui::Margin {
-                    left: 24,
-                    right: 24,
-                    top: 18,
-                    bottom: 0,
-                }),
-        )
-        .show_inside(ui, |ui| {
+    // Fixed chrome region — drawn with regular widgets (NOT Panel::top,
+    // which doesn't advance the parent ui's cursor and would let the body
+    // tab content overlap the header / tab bar).
+    egui::Frame::default()
+        .inner_margin(egui::Margin {
+            left: 24,
+            right: 24,
+            top: 18,
+            bottom: 0,
+        })
+        .show(ui, |ui| {
             draw_header(ui, m);
             ui.add_space(14.0);
             draw_tabs(ui, m, &mut state.selected_tab);

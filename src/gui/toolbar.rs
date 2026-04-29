@@ -57,54 +57,62 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             search.request_focus();
         }
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .button(RichText::new("Clear").color(Color32::from_rgb(248, 113, 113)))
-                .on_hover_text("Discard every captured message (⇧⌘X)")
-                .clicked()
-            {
-                out.clear_clicked = true;
-            }
-            ui.add_space(2.0);
-            if ui
-                .button(theme_icon(*tctx.theme))
-                .on_hover_text("Toggle theme (T)")
-                .clicked()
-            {
-                *tctx.theme = next_theme(*tctx.theme);
-            }
-            if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
-                out.settings_clicked = true;
-            }
-            if ui
-                .button("?")
-                .on_hover_text("Keyboard shortcuts (?)")
-                .clicked()
-            {
-                out.help_clicked = true;
-            }
-            ui.add_space(2.0);
-            let pause_label = if *tctx.paused {
-                "▶ Resume"
-            } else {
-                "⏸ Pause"
-            };
-            if ui
-                .button(pause_label)
-                .on_hover_text("Pause / resume capture display (P)")
-                .clicked()
-            {
-                *tctx.paused = !*tctx.paused;
-            }
-            if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
-                out.relay_clicked = true;
-            }
-            ui.add_space(6.0);
-            ui.label(
-                RichText::new(format!("{} captured", tctx.message_count))
-                    .color(ui.style().visuals.weak_text_color()),
-            );
-        });
+        // Claim ALL remaining horizontal space and lay out from the right
+        // edge inward — `with_layout(right_to_left, ...)` inside a horizontal
+        // ui doesn't pick up the remaining width on its own.
+        ui.allocate_ui_with_layout(
+            egui::vec2(ui.available_width(), ui.available_height()),
+            egui::Layout::right_to_left(egui::Align::Center),
+            |ui| {
+                ui.add_space(8.0);
+                if ui
+                    .button(RichText::new("Clear").color(Color32::from_rgb(248, 113, 113)))
+                    .on_hover_text("Discard every captured message (⇧⌘X)")
+                    .clicked()
+                {
+                    out.clear_clicked = true;
+                }
+                ui.add_space(2.0);
+                if ui
+                    .button(theme_icon(*tctx.theme))
+                    .on_hover_text("Toggle theme (T)")
+                    .clicked()
+                {
+                    *tctx.theme = next_theme(*tctx.theme);
+                }
+                if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
+                    out.settings_clicked = true;
+                }
+                if ui
+                    .button("?")
+                    .on_hover_text("Keyboard shortcuts (?)")
+                    .clicked()
+                {
+                    out.help_clicked = true;
+                }
+                ui.add_space(2.0);
+                let pause_label = if *tctx.paused {
+                    "▶ Resume"
+                } else {
+                    "⏸ Pause"
+                };
+                if ui
+                    .button(pause_label)
+                    .on_hover_text("Pause / resume capture display (P)")
+                    .clicked()
+                {
+                    *tctx.paused = !*tctx.paused;
+                }
+                if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
+                    out.relay_clicked = true;
+                }
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(format!("{} captured", tctx.message_count))
+                        .color(ui.style().visuals.weak_text_color()),
+                );
+            },
+        );
     });
 
     out

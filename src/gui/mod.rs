@@ -21,7 +21,7 @@ use crate::message::Message;
 use crate::server::ServerHandle;
 use crate::settings::PersistentSettings;
 
-use self::detail::{DetailState, DetailTab};
+use self::detail::{DetailContext, DetailState, DetailTab};
 use self::inbox::{InboxAction, InboxState};
 use self::repaint::StoreSubscription;
 use self::toasts::ToastList;
@@ -216,15 +216,20 @@ impl eframe::App for MailboxApp {
                 }
             });
 
-        let selected = self.inbox.selected_id.and_then(|id| {
-            self.list_snapshot
-                .iter()
-                .find(|m| m.id == id)
-                .cloned()
-        });
+        let selected = self
+            .inbox
+            .selected_id
+            .and_then(|id| self.list_snapshot.iter().find(|m| m.id == id).cloned());
+        let server = self.server.clone();
+        let mut toasts = std::mem::take(&mut self.toasts);
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            detail::render(ui, &mut self.detail, selected.as_ref());
+            let mut dctx = DetailContext {
+                server: &server,
+                toasts: &mut toasts,
+            };
+            detail::render(ui, &mut self.detail, selected.as_ref(), &mut dctx);
         });
+        self.toasts = toasts;
 
         // Toasts overlay last so they sit above panels.
         self.toasts.show(&ctx);

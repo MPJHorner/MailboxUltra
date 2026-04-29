@@ -44,7 +44,7 @@ fn main() -> ExitCode {
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("MailBox Ultra")
-        .with_inner_size([1200.0, 760.0])
+        .with_inner_size([1400.0, 900.0])
         .with_min_inner_size([720.0, 480.0]);
     if let Some(icon) = load_window_icon() {
         viewport = viewport.with_icon(icon);

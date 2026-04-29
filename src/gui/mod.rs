@@ -6,10 +6,13 @@
 //! Relay / Help windows (Phase 7) build on this skeleton.
 
 pub mod detail;
+pub mod help_window;
 pub mod inbox;
 #[cfg(target_os = "macos")]
 pub mod native_html;
+pub mod relay_window;
 pub mod repaint;
+pub mod settings_window;
 pub mod theme;
 pub mod toasts;
 pub mod toolbar;
@@ -24,8 +27,11 @@ use crate::server::ServerHandle;
 use crate::settings::PersistentSettings;
 
 use self::detail::{DetailContext, DetailState, DetailTab};
+use self::help_window::HelpWindowState;
 use self::inbox::{InboxAction, InboxState};
+use self::relay_window::RelayWindowState;
 use self::repaint::StoreSubscription;
+use self::settings_window::SettingsWindowState;
 use self::toasts::ToastList;
 use self::toolbar::ToolbarContext;
 
@@ -42,6 +48,10 @@ pub struct MailboxApp {
     list_snapshot: Vec<Message>,
     pending_focus_search: bool,
     last_applied_theme: crate::settings::Theme,
+
+    settings_window: SettingsWindowState,
+    relay_window: RelayWindowState,
+    help_window: HelpWindowState,
 
     #[cfg(target_os = "macos")]
     native_html: Option<native_html::NativeHtmlView>,
@@ -75,6 +85,9 @@ impl MailboxApp {
             list_snapshot: Vec::new(),
             pending_focus_search: false,
             last_applied_theme: settings.theme,
+            settings_window: SettingsWindowState::default(),
+            relay_window: RelayWindowState::default(),
+            help_window: HelpWindowState::default(),
             #[cfg(target_os = "macos")]
             native_html,
         }
@@ -215,14 +228,13 @@ impl eframe::App for MailboxApp {
             self.toasts.info("Inbox cleared");
         }
         if tb_out.settings_clicked || settings_via_shortcut {
-            self.toasts
-                .info("Preferences window will land in a later step");
+            self.settings_window.open_with(&self.server.settings());
         }
         if tb_out.help_clicked || help_via_shortcut {
-            self.toasts.info("Help dialog will land in a later step");
+            self.help_window.open = true;
         }
         if tb_out.relay_clicked {
-            self.toasts.info("Relay window will land in a later step");
+            self.relay_window.open_with(&self.server.settings());
         }
 
         // Inbox + detail panes.
@@ -269,7 +281,26 @@ impl eframe::App for MailboxApp {
             }
         }
 
-        // Toasts overlay last so they sit above panels.
+        // Modal-ish windows: rendered after the panels so they float on top.
+        settings_window::render(
+            &ctx,
+            &mut self.settings_window,
+            &self.server,
+            &mut self.toasts,
+        );
+        relay_window::render(&ctx, &mut self.relay_window, &self.server, &mut self.toasts);
+        help_window::render(&ctx, &mut self.help_window);
+
+        // Hide the WKWebView while a modal is up so it doesn't float over the
+        // dialog content.
+        #[cfg(target_os = "macos")]
+        if self.settings_window.open || self.relay_window.open || self.help_window.open {
+            if let Some(view) = self.native_html.as_ref() {
+                view.set_visible(false);
+            }
+        }
+
+        // Toasts overlay last so they sit above panels and dialogs.
         self.toasts.show(&ctx);
 
         // Idle-friendly repaint cap. The store-event bridge is the primary

@@ -108,6 +108,16 @@ impl MailboxApp {
         let store = self.server.store();
         let limit = store.capacity();
         self.list_snapshot = store.list(limit);
+
+        // Auto-select the newest message when nothing's selected. Mirrors the
+        // "click the inbox, see the latest message" behaviour Mac mail apps
+        // have, and means new captured mail is immediately readable without
+        // a click.
+        if self.inbox.selected_id.is_none() {
+            if let Some(first) = self.list_snapshot.first() {
+                self.inbox.selected_id = Some(first.id);
+            }
+        }
     }
 
     fn handle_inbox_keys(&mut self, ctx: &egui::Context) {

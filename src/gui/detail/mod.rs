@@ -93,71 +93,74 @@ pub fn render(
     message: Option<&Message>,
     ctx: &mut DetailContext<'_>,
 ) {
+    tracing::trace!(
+        "detail::render entry: max_rect={:?} selected={}",
+        ui.max_rect(),
+        message.is_some(),
+    );
     let Some(m) = message else {
         empty(ui);
         return;
     };
 
-    // Explicit rect-based layout. Frame::show / Panel::top inside a
-    // CentralPanel had subtle issues with cursor advancement that let the
-    // tab body overlap (and the WKWebView cover) the chrome region. We
-    // dodge all that by manually carving the central panel into a fixed
-    // chrome rect at the top and a body rect below it.
-    let full = ui.max_rect();
-    let chrome_height = 132.0;
-    let chrome_rect = egui::Rect::from_min_size(
-        full.min,
-        egui::vec2(full.width(), chrome_height),
-    );
-    let body_rect = egui::Rect::from_min_max(
-        egui::pos2(full.left(), full.top() + chrome_height),
-        full.max,
-    );
+    // Chrome (header + tabs) as a top panel inside the central panel.
+    // egui's `Panel::top.show_inside` is the only pattern in this codebase
+    // that reliably advances the parent cursor — see the
+    // `advance_cursor_after_rect` call in egui's `show_inside_dyn`.
+    let chrome_frame = egui::Frame::default()
+        .fill(ui.style().visuals.window_fill)
+        .stroke(egui::Stroke::NONE)
+        .inner_margin(egui::Margin {
+            left: 24,
+            right: 24,
+            top: 18,
+            bottom: 12,
+        });
+    let chrome_response = egui::Panel::top("detail-chrome")
+        .resizable(false)
+        .show_separator_line(false)
+        .frame(chrome_frame)
+        .show_inside(ui, |ui| {
+            draw_header(ui, m);
+            ui.add_space(12.0);
+            draw_tabs(ui, m, &mut state.selected_tab);
+        });
 
-    // Chrome: header + tabs.
-    ui.scope_builder(
-        egui::UiBuilder::new().max_rect(chrome_rect),
-        |ui| {
-            egui::Frame::default()
-                .inner_margin(egui::Margin {
-                    left: 24,
-                    right: 24,
-                    top: 18,
-                    bottom: 0,
-                })
-                .show(ui, |ui| {
-                    draw_header(ui, m);
-                    ui.add_space(12.0);
-                    draw_tabs(ui, m, &mut state.selected_tab);
-                });
-        },
+    let chrome_rect = chrome_response.response.rect;
+    tracing::trace!(
+        "detail layout: full={:?} chrome={:?} cursor={:?}",
+        ui.max_rect(),
+        chrome_rect,
+        ui.cursor(),
     );
 
     // Hairline below the chrome.
+    let bottom_y = chrome_rect.bottom() - 0.5;
     ui.painter().line_segment(
         [
-            egui::pos2(full.left(), chrome_rect.bottom() - 0.5),
-            egui::pos2(full.right(), chrome_rect.bottom() - 0.5),
+            egui::pos2(chrome_rect.left(), bottom_y),
+            egui::pos2(chrome_rect.right(), bottom_y),
         ],
-        egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color),
+        egui::Stroke::new(
+            1.0,
+            ui.style().visuals.widgets.noninteractive.bg_stroke.color,
+        ),
     );
 
-    // Body fills the remaining rect explicitly.
-    ui.scope_builder(
-        egui::UiBuilder::new().max_rect(body_rect),
-        |ui| match state.selected_tab {
-            DetailTab::Html => html::render(ui, &mut state.html, m, ctx),
-            DetailTab::Text => with_padded_scroll(ui, "text", |ui| text::render(ui, m)),
-            DetailTab::Headers => with_padded_scroll(ui, "headers", |ui| headers::render(ui, m)),
-            DetailTab::Attachments => {
-                with_padded_scroll(ui, "attachments", |ui| attachments::render(ui, m, ctx))
-            }
-            DetailTab::Source => with_padded_scroll(ui, "source", |ui| source::render(ui, m)),
-            DetailTab::Release => with_padded_scroll(ui, "release", |ui| {
-                release::render(ui, &mut state.release, m, ctx)
-            }),
-        },
-    );
+    // Body — the rest of the central panel after the chrome panel was
+    // drawn. egui has already advanced our cursor past the chrome.
+    match state.selected_tab {
+        DetailTab::Html => html::render(ui, &mut state.html, m, ctx),
+        DetailTab::Text => with_padded_scroll(ui, "text", |ui| text::render(ui, m)),
+        DetailTab::Headers => with_padded_scroll(ui, "headers", |ui| headers::render(ui, m)),
+        DetailTab::Attachments => {
+            with_padded_scroll(ui, "attachments", |ui| attachments::render(ui, m, ctx))
+        }
+        DetailTab::Source => with_padded_scroll(ui, "source", |ui| source::render(ui, m)),
+        DetailTab::Release => with_padded_scroll(ui, "release", |ui| {
+            release::render(ui, &mut state.release, m, ctx)
+        }),
+    }
 
     // Hide the WKWebView whenever the active tab isn't HTML so it doesn't
     // float over a different tab's content.

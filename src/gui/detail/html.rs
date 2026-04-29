@@ -55,6 +55,23 @@ impl DeviceSize {
             DeviceSize::Mobile => "390",
         }
     }
+    /// User-Agent string to set on the WKWebView so UA-gated CSS / sniffing
+    /// behaves the same way it would in iOS Mail / iPad Mail. The viewport
+    /// resize on its own triggers `@media (max-width: …)` rules — the UA
+    /// is the second axis some senders branch on.
+    pub fn user_agent(self) -> Option<&'static str> {
+        match self {
+            DeviceSize::Desktop => None,
+            DeviceSize::Tablet => Some(
+                "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 \
+                 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+            ),
+            DeviceSize::Mobile => Some(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 \
+                 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+            ),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -164,6 +181,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut HtmlState, m: &Message, ctx: &mut D
                         egui::StrokeKind::Inside,
                     );
                 }
+                view.set_user_agent(state.device.user_agent());
                 view.set_frame(frame_rect);
                 view.set_visible(true);
                 view.load(m.id, html);

@@ -24,7 +24,7 @@ MailBox Ultra implements just enough of [RFC 5321](https://datatracker.ietf.org/
 | `VRFY` | Returns `252` (per RFC, "cannot verify but will accept"). |
 | `AUTH PLAIN \| LOGIN` | See [authentication](#authentication). |
 
-`STARTTLS` is reserved for a future release. There is no plan to implement legacy `SOML`, `SAML`, `EXPN`, or `TURN`.
+`STARTTLS` is intentionally absent. MailBox Ultra is a local-only tool — the listener only ever binds `127.0.0.1` unless you change the bind address in Preferences, so wrapping plaintext in TLS would be ceremony with no security benefit. There is no plan to implement legacy `SOML`, `SAML`, `EXPN`, or `TURN`.
 
 ## EHLO capabilities
 
@@ -34,15 +34,22 @@ MailBox Ultra implements just enough of [RFC 5321](https://datatracker.ietf.org/
 250-8BITMIME
 250-SMTPUTF8
 250-SIZE 26214400
-250-AUTH PLAIN LOGIN     (only when --auth is set)
+250-AUTH PLAIN LOGIN     (only when "Require AUTH" is enabled)
 250 HELP
 ```
 
-`SIZE` mirrors `--max-message-size` (default 25 MiB).
+`SIZE` mirrors the **Max message size** field in Preferences (default 25 MiB).
 
 ## Authentication
 
-Set `--auth user:pass` to require authentication. Without the flag, no AUTH is advertised and the server accepts anyone. With the flag, attempting `MAIL FROM` before authenticating returns:
+By default, no AUTH is advertised and the server accepts anyone. To require credentials:
+
+1. Open Preferences with `⌘,`.
+2. Under the **SMTP** section, tick **Require AUTH**.
+3. Fill in **User** and **Password**.
+4. Click **Apply**.
+
+The SMTP listener restarts in place; existing captured messages are preserved. After Apply, attempting `MAIL FROM` before authenticating returns:
 
 ```text
 530 5.7.0 authentication required
@@ -85,17 +92,17 @@ The server is permissive about case and whitespace. Initial-response form (usern
 
 ## Size limits
 
-`--max-message-size` rejects oversize bodies with `552 5.3.4` after consuming the data so the client receives a clean response. The captured envelope is reset on rejection — RSET semantics, automatically.
+The **Max message size** field in Preferences sets the cap. Oversize bodies get `552 5.3.4` after the data is consumed so the client receives a clean response. The captured envelope is reset on rejection — RSET semantics, automatically.
 
 ## Capture vs. delivery
 
-Plain capture: nothing is delivered, the message lands in the in-memory buffer and the [JSON+SSE API]({{base}}/api/), and the SMTP transaction returns `250 2.0.0 message accepted`.
+Plain capture: nothing is delivered, the message lands in the in-app inbox, and the SMTP transaction returns `250 2.0.0 message accepted`.
 
-With `--relay smtp://upstream`, the same flow runs *and* the relay task hands the message to the upstream MTA. If the relay fails, the captured message is still in the buffer; the failure is logged at `warn` level. See [relay mode]({{base}}/relay/) for details.
+With **Forward each captured message upstream** ticked under Relay, the same flow runs *and* a relay task hands the message to the upstream MTA. If the relay fails, the captured message is still in the inbox; the failure is surfaced in the toolbar relay pill. See [relay mode]({{base}}/relay/) for details.
 
 ## Hostname
 
-`--hostname NAME` controls what the server announces in the `220` greeting and the `250 NAME hello` response. Default is `MailBoxUltra`. Some sender libraries pin to a specific hostname for testing; this is the knob.
+The **Hostname** field in Preferences controls what the server announces in the `220` greeting and the `250 NAME hello` response. Default is `MailBoxUltra`. Some sender libraries pin to a specific hostname for testing; this is the knob.
 
 ## Rejected verbs
 
@@ -115,4 +122,4 @@ Want to poke the protocol by hand? Use `nc`:
 nc -C 127.0.0.1 1025
 ```
 
-Type `EHLO me`, `MAIL FROM:<a@x>`, `RCPT TO:<b@x>`, `DATA`, the body, `.`, `QUIT`. The web UI updates in real time.
+Type `EHLO me`, `MAIL FROM:<a@x>`, `RCPT TO:<b@x>`, `DATA`, the body, `.`, `QUIT`. The inbox updates in real time.

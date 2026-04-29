@@ -17,6 +17,7 @@ pub mod settings_window;
 pub mod theme;
 pub mod toasts;
 pub mod toolbar;
+pub mod widgets;
 
 use std::sync::Arc;
 
@@ -305,8 +306,8 @@ impl eframe::App for MailboxApp {
             .stroke(egui::Stroke::NONE)
             .inner_margin(egui::Margin::ZERO);
         egui::Panel::left("inbox")
-            .default_size(380.0)
-            .min_size(280.0)
+            .default_size(330.0)
+            .min_size(260.0)
             .show_separator_line(false)
             .frame(inbox_frame)
             .show_inside(ui, |ui| {
@@ -408,10 +409,7 @@ impl eframe::App for MailboxApp {
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .button(
-                                    egui::RichText::new("Clear all")
-                                        .color(egui::Color32::from_rgb(248, 113, 113)),
-                                )
+                                .button(egui::RichText::new("Clear all").color(theme::DANGER))
                                 .clicked()
                             {
                                 confirm = true;

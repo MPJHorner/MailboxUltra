@@ -36,6 +36,7 @@ use chrono::{DateTime, Local};
 use egui::{Color32, RichText, Sense, Stroke};
 
 use crate::gui::theme;
+use crate::gui::widgets;
 use crate::message::Message;
 use crate::server::ServerHandle;
 
@@ -202,27 +203,18 @@ fn draw_header(ui: &mut egui::Ui, m: &Message) {
     let size = humansize::format_size(m.size as u64, humansize::BINARY);
     let accent = theme::accent(ui.ctx());
 
+    let muted = theme::muted_text_color(ui.ctx());
     ui.horizontal_wrapped(|ui| {
-        from_pill(ui, &from, accent);
-        ui.label(RichText::new("→").color(ui.style().visuals.weak_text_color()));
-        plain_pill(ui, &to_line);
+        widgets::address_pill(ui, &from, Some(accent));
+        ui.label(RichText::new("→").color(muted));
+        widgets::address_pill(ui, &to_line, None);
         ui.add_space(8.0);
-        ui.label(
-            RichText::new(timestamp)
-                .small()
-                .monospace()
-                .color(ui.style().visuals.weak_text_color()),
-        );
-        ui.label(RichText::new("·").color(ui.style().visuals.weak_text_color()));
-        ui.label(
-            RichText::new(size)
-                .small()
-                .monospace()
-                .color(ui.style().visuals.weak_text_color()),
-        );
+        ui.label(RichText::new(timestamp).small().monospace().color(muted));
+        ui.label(RichText::new("·").color(muted));
+        ui.label(RichText::new(size).small().monospace().color(muted));
         if m.authenticated {
             ui.add_space(4.0);
-            auth_pill(ui, accent);
+            widgets::accent_pill(ui, "AUTH");
         }
     });
     ui.add_space(8.0);
@@ -230,62 +222,12 @@ fn draw_header(ui: &mut egui::Ui, m: &Message) {
     ui.add(
         egui::Label::new(
             RichText::new(subject)
-                .size(22.0)
+                .size(20.0)
                 .strong()
-                .color(ui.style().visuals.text_color()),
+                .color(theme::body_text_color(ui.ctx())),
         )
         .wrap_mode(egui::TextWrapMode::Wrap),
     );
-}
-
-fn from_pill(ui: &mut egui::Ui, value: &str, accent: Color32) {
-    egui::Frame::default()
-        .fill(ui.style().visuals.faint_bg_color)
-        .corner_radius(egui::CornerRadius::same(255))
-        .inner_margin(egui::Margin::symmetric(12, 4))
-        .stroke(Stroke::new(
-            1.0,
-            ui.style().visuals.widgets.noninteractive.bg_stroke.color,
-        ))
-        .show(ui, |ui| {
-            ui.add(
-                egui::Label::new(RichText::new(value).color(accent).monospace().size(13.0))
-                    .selectable(true),
-            );
-        });
-}
-
-fn plain_pill(ui: &mut egui::Ui, value: &str) {
-    egui::Frame::default()
-        .fill(ui.style().visuals.faint_bg_color)
-        .corner_radius(egui::CornerRadius::same(255))
-        .inner_margin(egui::Margin::symmetric(12, 4))
-        .stroke(Stroke::new(
-            1.0,
-            ui.style().visuals.widgets.noninteractive.bg_stroke.color,
-        ))
-        .show(ui, |ui| {
-            ui.add(
-                egui::Label::new(
-                    RichText::new(value)
-                        .color(ui.style().visuals.text_color())
-                        .monospace()
-                        .size(13.0),
-                )
-                .selectable(true),
-            );
-        });
-}
-
-fn auth_pill(ui: &mut egui::Ui, accent: Color32) {
-    egui::Frame::default()
-        .fill(accent.gamma_multiply(0.18))
-        .stroke(Stroke::new(1.0, accent))
-        .corner_radius(egui::CornerRadius::same(255))
-        .inner_margin(egui::Margin::symmetric(8, 2))
-        .show(ui, |ui| {
-            ui.label(RichText::new("AUTH").color(accent).strong().small());
-        });
 }
 
 fn draw_tabs(ui: &mut egui::Ui, m: &Message, selected: &mut DetailTab) {

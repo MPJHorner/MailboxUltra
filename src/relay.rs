@@ -1,5 +1,7 @@
 //! Optional relay: after a captured message lands in the store, hand it off
-//! to a real upstream MTA. Configured via `--relay smtp://host:port`.
+//! to a real upstream MTA. Configured via Preferences → Relay → "Forward
+//! each captured message upstream" plus an `smtp://host:port` or
+//! `smtps://host:port` URL.
 //!
 //! The relay runs as a separate task that consumes the broadcast channel; a
 //! relay failure never blocks capture or causes the original sender to see an

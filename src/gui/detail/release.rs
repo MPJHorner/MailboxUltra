@@ -10,6 +10,7 @@ use egui::RichText;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+use crate::gui::theme;
 use crate::message::Message;
 use crate::relay::{relay_message, RelayConfig};
 use crate::server::ServerHandle;
@@ -57,11 +58,7 @@ pub fn render(
     );
     if let Some(err) = &state.last_error {
         ui.add_space(4.0);
-        ui.label(
-            RichText::new(err)
-                .color(egui::Color32::from_rgb(248, 113, 113))
-                .small(),
-        );
+        ui.label(RichText::new(err).color(theme::DANGER).small());
     }
     ui.add_space(8.0);
 

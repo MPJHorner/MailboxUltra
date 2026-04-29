@@ -22,23 +22,18 @@ const REPO = 'https://github.com/MPJHorner/MailboxUltra';
 const NAV = [
   { href: '/install/', label: 'Install' },
   { href: '/quick-start/', label: 'Quick start' },
-  { href: '/cli/', label: 'CLI' },
-  { href: '/smtp/', label: 'SMTP' },
-  { href: '/web-ui/', label: 'Web UI' },
-  { href: '/api/', label: 'API' },
+  { href: '/configuration/', label: 'Preferences' },
+  { href: '/relay/', label: 'Relay' },
   { href: '/changelog/', label: 'Changelog' },
 ];
 
 const FOOTER_LINKS = [
   { href: '/install/', label: 'Install' },
   { href: '/quick-start/', label: 'Quick start' },
-  { href: '/cli/', label: 'CLI reference' },
+  { href: '/configuration/', label: 'Preferences' },
   { href: '/smtp/', label: 'SMTP' },
-  { href: '/relay/', label: 'Relay mode' },
+  { href: '/relay/', label: 'Relay' },
   { href: '/logging/', label: 'Logging' },
-  { href: '/web-ui/', label: 'Web UI' },
-  { href: '/api/', label: 'API' },
-  { href: '/configuration/', label: 'Configuration' },
   { href: '/use-cases/', label: 'Use cases' },
   { href: '/comparison/', label: 'Comparison' },
   { href: '/contributing/', label: 'Contributing' },
@@ -74,14 +69,6 @@ async function loadVersion() {
   const m = cargo.match(/^version\s*=\s*"([^"]+)"/m);
   if (!m) throw new Error('Could not extract version from Cargo.toml');
   return m[1];
-}
-
-async function loadCliHelp() {
-  const live = process.env.CLI_HELP_PATH;
-  if (live && existsSync(live)) return readFile(live, 'utf8');
-  const cached = join(SITE, 'cli-help.txt');
-  if (existsSync(cached)) return readFile(cached, 'utf8');
-  return null;
 }
 
 async function loadChangelogEntries() {
@@ -272,7 +259,7 @@ function buildHead({ title, description, slug, version }) {
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
 }
 
-async function buildPages({ version, cliHelp, changelogEntries, templates }) {
+async function buildPages({ version, changelogEntries, templates }) {
   const contentDir = join(SITE, 'content');
   const files = (await readdir(contentDir)).filter((f) => f.endsWith('.md'));
   const pages = [];
@@ -281,12 +268,11 @@ async function buildPages({ version, cliHelp, changelogEntries, templates }) {
     const fm = matter(raw);
     const slug = fm.data.slug ?? (basename(file, '.md') === 'index' ? '' : basename(file, '.md'));
     const title = fm.data.title || 'MailBox Ultra';
-    const description = fm.data.description || 'Local SMTP fake inbox for developers.';
+    const description = fm.data.description || 'Native macOS SMTP fake inbox for developers.';
     const layout = fm.data.layout || (slug === '' ? 'home' : 'page');
 
     const replacements = {
       version,
-      cli_help: cliHelp ? escapeHtml(cliHelp) : '<em>The CLI help text is rendered at build time. Run `mailbox-ultra --help` locally to see it.</em>',
       changelog_html: renderChangelogHtml(changelogEntries),
       base: BASE,
       repo: REPO,
@@ -366,16 +352,12 @@ async function main() {
   console.time('build');
   await rm(DIST, { recursive: true, force: true });
   await mkdir(DIST, { recursive: true });
-  const [version, cliHelp, changelogEntries, templates] = await Promise.all([
+  const [version, changelogEntries, templates] = await Promise.all([
     loadVersion(),
-    loadCliHelp(),
     loadChangelogEntries(),
     loadTemplates(),
   ]);
-  if (!cliHelp) {
-    console.warn('  ! cli-help.txt missing — CLI page will show a fallback notice');
-  }
-  const pages = await buildPages({ version, cliHelp, changelogEntries, templates });
+  const pages = await buildPages({ version, changelogEntries, templates });
   await Promise.all(pages.map(writePage));
   await writeSitemap(pages);
   await writeRobots();

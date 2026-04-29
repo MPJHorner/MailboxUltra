@@ -4,12 +4,14 @@
 
 use std::sync::Arc;
 
-use egui::{Color32, RichText};
+use egui::RichText;
 
 use crate::server::ServerHandle;
 use crate::settings::{PersistentSettings, RelaySettings};
 
+use super::theme;
 use super::toasts::ToastList;
+use super::widgets;
 
 #[derive(Default)]
 pub struct RelayWindowState {
@@ -70,37 +72,42 @@ pub fn render(
                     capture. Use smtp:// for plain delivery, smtps:// to wrap in TLS.",
                 )
                 .small()
-                .color(ui.style().visuals.weak_text_color()),
+                .color(theme::muted_text_color(ui.ctx())),
             );
-            ui.add_space(8.0);
-            ui.checkbox(&mut state.enabled, "Forward to upstream");
+            ui.add_space(10.0);
+            widgets::nice_checkbox(ui, &mut state.enabled, "Forward to upstream");
             if state.enabled {
-                ui.add_space(4.0);
+                ui.add_space(6.0);
                 ui.add(
                     egui::TextEdit::singleline(&mut state.url)
                         .hint_text("smtp://relay.example.com:25")
                         .desired_width(420.0),
                 );
-                ui.checkbox(
+                ui.add_space(4.0);
+                widgets::nice_checkbox(
+                    ui,
                     &mut state.insecure,
                     "Skip TLS certificate verification (dev only)",
                 );
             }
             if let Some(err) = &state.last_error {
                 ui.add_space(6.0);
-                ui.label(
-                    RichText::new(err)
-                        .color(Color32::from_rgb(248, 113, 113))
-                        .small(),
-                );
+                ui.label(RichText::new(err).color(theme::DANGER).small());
             }
-            ui.add_space(8.0);
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if ui.button("Cancel").clicked() {
                     cancel_clicked = true;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Save").clicked() {
+                    let save = egui::Button::new(
+                        RichText::new("Save").color(egui::Color32::WHITE).strong(),
+                    )
+                    .fill(theme::accent(ui.ctx()))
+                    .stroke(egui::Stroke::new(1.0, theme::accent(ui.ctx())));
+                    if ui.add(save).clicked() {
                         save_clicked = true;
                     }
                     if ui

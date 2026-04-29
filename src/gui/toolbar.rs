@@ -1,10 +1,11 @@
 //! Top toolbar: brand, SMTP URL pill, search, capture pause, theme toggle,
 //! settings + clear buttons.
 
-use egui::{Color32, Key, RichText, Sense, Stroke};
+use egui::{Key, RichText, Sense, Stroke};
 
 use super::theme;
 use super::toasts::ToastList;
+use super::widgets;
 use crate::settings::Theme;
 
 pub struct ToolbarContext<'a> {
@@ -39,67 +40,59 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.add_space(14.0);
 
-        // Right cluster.
-        if ui
-            .button(RichText::new("Clear").color(Color32::from_rgb(248, 113, 113)))
-            .on_hover_text("Discard every captured message (⇧⌘X)")
-            .clicked()
+        // Right cluster — icon buttons read tighter than the default
+        // text-button rectangles when stacked five-deep.
+        if widgets::icon_button_colored(ui, "🗑", "Clear inbox (⇧⌘X)", theme::DANGER).clicked()
         {
             out.clear_clicked = true;
         }
-        ui.add_space(2.0);
-        if ui
-            .button(theme_icon(*tctx.theme))
-            .on_hover_text("Toggle theme (T)")
-            .clicked()
-        {
+        if widgets::icon_button(ui, theme_icon(*tctx.theme), "Toggle theme (T)").clicked() {
             *tctx.theme = next_theme(*tctx.theme);
         }
-        if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
+        if widgets::icon_button(ui, "⚙", "Preferences (⌘,)").clicked() {
             out.settings_clicked = true;
         }
-        if ui
-            .button("?")
-            .on_hover_text("Keyboard shortcuts (?)")
-            .clicked()
-        {
+        if widgets::icon_button(ui, "?", "Keyboard shortcuts (?)").clicked() {
             out.help_clicked = true;
         }
-        ui.add_space(2.0);
-        let pause_label = if *tctx.paused {
-            "▶ Resume"
+        let pause_glyph = if *tctx.paused { "▶" } else { "⏸" };
+        let pause_tooltip = if *tctx.paused {
+            "Resume capture (P)"
         } else {
-            "⏸ Pause"
+            "Pause capture (P)"
         };
-        if ui
-            .button(pause_label)
-            .on_hover_text("Pause / resume capture display (P)")
-            .clicked()
-        {
+        if widgets::icon_toggle(ui, pause_glyph, pause_tooltip, *tctx.paused).clicked() {
             *tctx.paused = !*tctx.paused;
         }
+        ui.add_space(4.0);
         if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
             out.relay_clicked = true;
         }
-        ui.add_space(6.0);
+        ui.add_space(8.0);
         ui.label(
             RichText::new(format!("{} captured", tctx.message_count))
-                .color(ui.style().visuals.weak_text_color()),
+                .small()
+                .color(theme::muted_text_color(ui.ctx())),
         );
 
         // Left cluster (nested left_to_right takes the remaining width).
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.add_space(14.0);
-            ui.label(RichText::new("✉").size(16.0).color(accent));
+            ui.label(RichText::new("✉").size(18.0).color(accent));
+            ui.label(
+                RichText::new("MailBox Ultra")
+                    .strong()
+                    .color(theme::body_text_color(ui.ctx())),
+            );
             ui.label(
                 RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
                     .small()
                     .monospace()
-                    .color(ui.style().visuals.weak_text_color()),
+                    .color(theme::dim_text_color(ui.ctx())),
             );
-            ui.add_space(12.0);
+            ui.add_space(10.0);
             smtp_pill(ui, tctx.smtp_url, tctx.toasts);
-            ui.add_space(12.0);
+            ui.add_space(10.0);
             let search = ui.add(
                 egui::TextEdit::singleline(tctx.search_query)
                     .hint_text("Filter from / to / subject  (/)")
@@ -130,16 +123,15 @@ fn relay_button(
     label: Option<&str>,
     accent: egui::Color32,
 ) -> egui::Response {
-    let visuals = ui.style().visuals.clone();
     let arrow_color = if active {
         accent
     } else {
-        visuals.text_color().gamma_multiply(0.7)
+        theme::muted_text_color(ui.ctx())
     };
     let text_color = if active {
         accent
     } else {
-        visuals.text_color().gamma_multiply(0.85)
+        theme::body_text_color(ui.ctx())
     };
     let label_galley = ui.painter().layout_no_wrap(
         format!("Relay  {}", label.unwrap_or("off")),
@@ -160,14 +152,11 @@ fn relay_button(
         (accent.gamma_multiply(0.18), accent)
     } else if response.hovered() {
         (
-            visuals.widgets.hovered.bg_fill,
-            visuals.widgets.inactive.bg_stroke.color,
+            theme::soft_bg(ui.ctx()),
+            theme::border_strong_color(ui.ctx()),
         )
     } else {
-        (
-            visuals.widgets.inactive.bg_fill,
-            visuals.widgets.inactive.bg_stroke.color,
-        )
+        (theme::elev2_bg(ui.ctx()), theme::border_color(ui.ctx()))
     };
     ui.painter()
         .rect_filled(rect, egui::CornerRadius::same(6), fill);
@@ -192,37 +181,36 @@ fn relay_button(
 }
 
 fn smtp_pill(ui: &mut egui::Ui, url: &str, toasts: &mut ToastList) {
-    // Two-pass render: first measure (to get the pill's hover state), then
-    // paint with the hover-aware fill colour so the user has a clear
-    // affordance that it's clickable.
-    let visuals = ui.style().visuals.clone();
+    // Two-pass render: pick fill from last-frame hover (egui remembers it) so
+    // the user gets an immediate hover affordance that it's clickable.
     let id = egui::Id::new("toolbar-smtp-pill");
-
-    // Measure first by running a dummy frame to get the size, then re-paint
-    // with hover. Simpler: pick fill upfront based on what hover state egui
-    // remembers from last frame.
     let last_hovered = ui
         .ctx()
         .memory(|m| m.data.get_temp::<bool>(id).unwrap_or(false));
     let fill = if last_hovered {
-        visuals.widgets.hovered.bg_fill
+        theme::soft_bg(ui.ctx())
     } else {
-        visuals.widgets.inactive.bg_fill
+        theme::elev2_bg(ui.ctx())
     };
-    let frame = egui::Frame::group(ui.style())
+    let frame = egui::Frame::new()
         .fill(fill)
         .corner_radius(egui::CornerRadius::same(14))
-        .inner_margin(egui::Margin::symmetric(10, 4))
-        .stroke(Stroke::NONE);
+        .inner_margin(egui::Margin::symmetric(12, 5))
+        .stroke(Stroke::new(1.0, theme::border_color(ui.ctx())));
     let response = frame
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new("SMTP")
                         .small()
-                        .color(visuals.weak_text_color()),
+                        .strong()
+                        .color(theme::dim_text_color(ui.ctx())),
                 );
-                ui.label(RichText::new(url).monospace());
+                ui.label(
+                    RichText::new(url)
+                        .monospace()
+                        .color(theme::body_text_color(ui.ctx())),
+                );
             });
         })
         .response

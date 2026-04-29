@@ -15,6 +15,7 @@
 #![cfg(target_os = "macos")]
 
 use std::cell::Cell;
+use std::hash::{Hash, Hasher};
 
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
@@ -41,6 +42,10 @@ pub struct NativeHtmlView {
     parent: Retained<NSView>,
     delegate: Retained<MBUNavDelegate>,
     last_loaded: Cell<Option<uuid::Uuid>>,
+    /// Hash of the most recently applied UA. Tracked so that switching the
+    /// device-size button (which switches UA) busts the `last_loaded`
+    /// short-circuit in `load` and the page actually re-renders.
+    last_ua_hash: Cell<u64>,
     last_visible: Cell<bool>,
 }
 
@@ -106,6 +111,7 @@ impl NativeHtmlView {
             parent: parent_view,
             delegate,
             last_loaded: Cell::new(None),
+            last_ua_hash: Cell::new(0),
             last_visible: Cell::new(false),
         })
     }
@@ -166,6 +172,37 @@ impl NativeHtmlView {
         }
     }
 
+    /// Switch the WKWebView's `User-Agent` so the rendered HTML can branch
+    /// on mobile vs desktop where it sniffs UA. Most emails are width-only
+    /// responsive (so the Mobile button's narrower frame is enough on its
+    /// own), but a few well-known senders ship UA-gated `<style>` blocks;
+    /// matching iOS Mail's WebKit UA on Mobile / iPad on Tablet keeps the
+    /// preview honest.
+    ///
+    /// Pass `None` to fall back to WKWebView's default desktop UA.
+    pub fn set_user_agent(&self, ua: Option<&str>) {
+        let new_hash = ua_hash(ua);
+        if new_hash == self.last_ua_hash.get() {
+            return;
+        }
+        self.last_ua_hash.set(new_hash);
+        unsafe {
+            match ua {
+                Some(s) => {
+                    let ns = NSString::from_str(s);
+                    self.web.setCustomUserAgent(Some(&ns));
+                }
+                None => {
+                    self.web.setCustomUserAgent(None);
+                }
+            }
+        }
+        // Invalidate the load cache so the next `load` call actually reissues
+        // `loadHTMLString:` — otherwise the page keeps the old layout that
+        // was rendered under the previous UA.
+        self.last_loaded.set(None);
+    }
+
     /// Empty the WKWebView. Called when the user deselects a message or
     /// navigates away from the HTML tab.
     pub fn clear(&self) {
@@ -179,6 +216,12 @@ impl NativeHtmlView {
                 self.web.loadHTMLString_baseURL(&blank, None);
         }
     }
+}
+
+fn ua_hash(ua: Option<&str>) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    ua.hash(&mut h);
+    h.finish()
 }
 
 impl Drop for NativeHtmlView {

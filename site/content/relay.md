@@ -8,62 +8,55 @@ slug: relay
 
 Plain capture is great for tests. Sometimes you want capture *and* delivery in the same run — for example, while staging a transactional rollout where you want to read every message before it ships, but still want it to ship.
 
-`--relay` does that.
+Relay mode does that.
 
 ## Quick start
 
-```sh
-mailbox-ultra --relay smtp://relay.example.com:25
-```
+1. Open Preferences with `⌘,`.
+2. Scroll to the **Relay** section.
+3. Tick **Forward each captured message upstream**.
+4. Paste the upstream URL into the **Upstream URL** field, e.g. `smtp://relay.example.com:25`.
+5. Click **Apply**.
 
-The capture port behaves exactly as before. After a message is captured and stored, a background relay task picks it up and reships it to `relay.example.com:25` over plain SMTP. The upstream's response does not affect what the original sender sees: capture always returns `250`. A relay failure is logged at `warn` level and the message stays in the in-memory buffer.
+The capture port behaves exactly as before. After a message is captured, a background relay task picks it up and reships it to the upstream MTA. The upstream's response does not affect what the original sender sees: capture always returns `250`. A relay failure is surfaced visually (the toolbar relay pill turns red) and the message stays in the inbox.
+
+The toolbar **Relay** pill goes from `Relay  off` to `Relay  relay.example.com:25` once enabled. Click the pill any time for a smaller standalone dialog that toggles relay without opening the full Preferences window.
 
 ## With authentication
 
-```sh
-mailbox-ultra --relay smtp://alice:s3cret@relay.example.com:587
+Put the credentials in the URL:
+
+```text
+smtp://alice:s3cret@relay.example.com:587
 ```
 
-User-info in the URL becomes `AUTH PLAIN` credentials when the relay reaches the upstream. The credentials are not stored anywhere on disk, and the `/api/relay` endpoint returns the URL with the credentials redacted.
+The userinfo becomes `AUTH PLAIN` credentials when the relay reaches the upstream. The credentials are stored as part of the settings JSON in your user-only Application Support directory.
 
 ## TLS
 
-`smtps://relay.example.com:465` is reserved for a future release. Right now it returns a clear error so you know the upstream isn't being silently downgraded:
+Use `smtps://` for upstreams that require TLS:
 
 ```text
-smtps:// relay is not yet implemented; use smtp:// or open a tracking issue
+smtps://relay.example.com:465
 ```
 
-If your upstream only accepts TLS, use a side-car (`stunnel`, an SMTP proxy, or `ssmtp`) until TLS lands. Subscribe to the [issue tracker](https://github.com/MPJHorner/MailboxUltra/issues) for status.
+The connection is wrapped in TLS using the system trust store. If your upstream serves a dev / staging certificate that isn't in the trust store, tick **Skip TLS certificate verification** under Relay. That option is intended for local development; do not point it at production traffic.
 
-## Runtime control
+## Hot-update
 
-The relay can be enabled, edited, or disabled while the server is running, without a restart. The web UI's "Relay" pill in the top bar opens a dialog; under the hood it talks to the [`/api/relay` endpoints]({{base}}/api/#api-relay).
+Relay settings are picked up without restarting the SMTP listener. You can flip the relay on, change the upstream URL, or turn it off mid-session — the captured-mail buffer is untouched, in-flight SMTP transactions complete, and the next captured message uses the new relay config.
 
-```sh
-# Enable
-curl -X PUT http://127.0.0.1:8025/api/relay \
-  -H 'content-type: application/json' \
-  -d '{"url":"smtp://relay.example.com:25"}'
+## One-off Release
 
-# Inspect
-curl http://127.0.0.1:8025/api/relay
+The **Release** tab on each captured message resends a single message to a specific upstream without touching the global relay setting. Useful when you want to capture mail in bulk and selectively forward only the ones you care about.
 
-# Disable
-curl -X DELETE http://127.0.0.1:8025/api/relay
-```
-
-## One-off release
-
-The Release tab on each captured message resends a single message to a specific upstream without touching the global relay setting. Useful when you want to capture mail in bulk and selectively forward only the ones you care about.
-
-## Failure semantics
+## Capture-then-forward semantics
 
 | Failure | Capture status | Relay status | Sender sees |
 |---|---|---|---|
-| Upstream refuses connection | Captured | Logged | `250` |
-| Upstream rejects MAIL FROM | Captured | Logged | `250` |
-| Upstream returns 5xx after DATA | Captured | Logged | `250` |
+| Upstream refuses connection | Captured | Logged + toolbar pill | `250` |
+| Upstream rejects MAIL FROM | Captured | Logged + toolbar pill | `250` |
+| Upstream returns 5xx after DATA | Captured | Logged + toolbar pill | `250` |
 | MailBox Ultra is killed mid-relay | Captured (in buffer until shutdown) | Lost | `250` |
 
 The capture path always wins. If you want the original sender to see relay failures, use a real MTA — that's a different tool.

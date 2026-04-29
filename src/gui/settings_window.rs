@@ -7,12 +7,14 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use egui::{Color32, RichText};
+use egui::{RichText, Stroke};
 
 use crate::server::ServerHandle;
 use crate::settings::{Auth, PersistentSettings, RelaySettings, Theme};
 
+use super::theme;
 use super::toasts::ToastList;
+use super::widgets;
 
 #[derive(Clone)]
 pub struct SettingsBuffer {
@@ -170,7 +172,7 @@ pub fn render(
         .open(&mut keep_open)
         .resizable(false)
         .collapsible(false)
-        .default_size([560.0, 0.0])
+        .default_size([580.0, 0.0])
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             let Some(buffer) = state.buffer.as_mut() else {
@@ -179,70 +181,91 @@ pub fn render(
             section(ui, "Servers", |ui| {
                 grid(ui, "servers-grid", |ui| {
                     label(ui, "SMTP port");
-                    ui.text_edit_singleline(&mut buffer.smtp_port);
+                    ui.add(field(&mut buffer.smtp_port).desired_width(120.0));
                     ui.end_row();
                     label(ui, "Bind address");
-                    ui.text_edit_singleline(&mut buffer.bind);
+                    ui.add(field(&mut buffer.bind).desired_width(180.0));
                     ui.end_row();
                 });
             });
             section(ui, "SMTP", |ui| {
                 grid(ui, "smtp-grid", |ui| {
                     label(ui, "Hostname");
-                    ui.text_edit_singleline(&mut buffer.hostname);
+                    ui.add(field(&mut buffer.hostname).desired_width(280.0));
                     ui.end_row();
-                    label(ui, "Max msg size (MiB)");
-                    ui.text_edit_singleline(&mut buffer.max_message_size_mib);
+                    label(ui, "Max message size");
+                    ui.horizontal(|ui| {
+                        ui.add(field(&mut buffer.max_message_size_mib).desired_width(80.0));
+                        ui.label(RichText::new("MiB").color(theme::muted_text_color(ui.ctx())));
+                    });
                     ui.end_row();
-                    label(ui, "Require AUTH");
-                    ui.checkbox(&mut buffer.auth_required, "");
-                    ui.end_row();
-                    if buffer.auth_required {
+                });
+                ui.add_space(4.0);
+                widgets::nice_checkbox(ui, &mut buffer.auth_required, "Require AUTH");
+                if buffer.auth_required {
+                    ui.add_space(2.0);
+                    grid(ui, "smtp-auth-grid", |ui| {
                         label(ui, "User");
-                        ui.text_edit_singleline(&mut buffer.auth_user);
+                        ui.add(field(&mut buffer.auth_user).desired_width(280.0));
                         ui.end_row();
                         label(ui, "Password");
-                        ui.add(egui::TextEdit::singleline(&mut buffer.auth_pass).password(true));
+                        ui.add(
+                            egui::TextEdit::singleline(&mut buffer.auth_pass)
+                                .password(true)
+                                .desired_width(280.0),
+                        );
                         ui.end_row();
-                    }
-                });
+                    });
+                }
             });
             section(ui, "Capture", |ui| {
                 grid(ui, "capture-grid", |ui| {
-                    label(ui, "Buffer size (messages)");
-                    ui.text_edit_singleline(&mut buffer.buffer_size);
+                    label(ui, "Buffer size");
+                    ui.horizontal(|ui| {
+                        ui.add(field(&mut buffer.buffer_size).desired_width(100.0));
+                        ui.label(
+                            RichText::new("messages").color(theme::muted_text_color(ui.ctx())),
+                        );
+                    });
                     ui.end_row();
                 });
             });
             section(ui, "Relay", |ui| {
-                ui.checkbox(
+                widgets::nice_checkbox(
+                    ui,
                     &mut buffer.relay_enabled,
-                    "Forward each captured message to upstream",
+                    "Forward each captured message upstream",
                 );
                 if buffer.relay_enabled {
+                    ui.add_space(4.0);
                     grid(ui, "relay-grid", |ui| {
-                        label(ui, "URL");
+                        label(ui, "Upstream URL");
                         ui.add(
-                            egui::TextEdit::singleline(&mut buffer.relay_url)
-                                .hint_text("smtp://relay.example.com:25"),
+                            field(&mut buffer.relay_url)
+                                .hint_text("smtp://relay.example.com:25")
+                                .desired_width(360.0),
                         );
                         ui.end_row();
                     });
-                    ui.checkbox(
+                    ui.add_space(2.0);
+                    widgets::nice_checkbox(
+                        ui,
                         &mut buffer.relay_insecure,
                         "Skip TLS certificate verification (dev only)",
                     );
                 }
             });
             section(ui, "Logging", |ui| {
-                ui.checkbox(
+                widgets::nice_checkbox(
+                    ui,
                     &mut buffer.log_file_enabled,
                     "Append every captured message as NDJSON to a log file",
                 );
                 if buffer.log_file_enabled {
+                    ui.add_space(4.0);
                     ui.horizontal(|ui| {
                         ui.add(
-                            egui::TextEdit::singleline(&mut buffer.log_file)
+                            field(&mut buffer.log_file)
                                 .hint_text("/path/to/messages.ndjson")
                                 .desired_width(360.0),
                         );
@@ -259,7 +282,8 @@ pub fn render(
             });
             section(ui, "Appearance", |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("Theme");
+                    ui.label(RichText::new("Theme").color(theme::muted_text_color(ui.ctx())));
+                    ui.add_space(8.0);
                     ui.radio_value(&mut buffer.theme, Theme::System, "System");
                     ui.radio_value(&mut buffer.theme, Theme::Dark, "Dark");
                     ui.radio_value(&mut buffer.theme, Theme::Light, "Light");
@@ -268,19 +292,22 @@ pub fn render(
 
             if let Some(err) = &state.last_error {
                 ui.add_space(6.0);
-                ui.label(
-                    RichText::new(err)
-                        .color(Color32::from_rgb(248, 113, 113))
-                        .small(),
-                );
+                ui.label(RichText::new(err).color(theme::DANGER).small());
             }
-            ui.add_space(8.0);
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if ui.button("Reset to defaults").clicked() {
                     reset_clicked = true;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Apply").clicked() {
+                    let apply = egui::Button::new(
+                        RichText::new("Apply").color(egui::Color32::WHITE).strong(),
+                    )
+                    .fill(theme::accent(ui.ctx()))
+                    .stroke(Stroke::new(1.0, theme::accent(ui.ctx())));
+                    if ui.add(apply).clicked() {
                         apply_clicked = true;
                     }
                     if ui.button("Cancel").clicked() {
@@ -332,25 +359,45 @@ pub fn render(
 }
 
 fn section(ui: &mut egui::Ui, title: &str, content: impl FnOnce(&mut egui::Ui)) {
+    ui.add_space(14.0);
+    ui.horizontal(|ui| {
+        ui.label(
+            RichText::new(title.to_uppercase())
+                .small()
+                .strong()
+                .color(theme::dim_text_color(ui.ctx())),
+        );
+        // Thin underline that runs to the right edge of the available width,
+        // anchoring the heading to the column rule below.
+        let r = ui.available_rect_before_wrap();
+        ui.painter().line_segment(
+            [
+                egui::pos2(r.left() + 6.0, r.center().y),
+                egui::pos2(r.right(), r.center().y),
+            ],
+            Stroke::new(1.0, theme::border_color(ui.ctx())),
+        );
+    });
     ui.add_space(8.0);
-    ui.label(
-        RichText::new(title)
-            .strong()
-            .color(ui.style().visuals.weak_text_color()),
-    );
-    ui.separator();
     content(ui);
 }
 
 fn grid(ui: &mut egui::Ui, id: &str, content: impl FnOnce(&mut egui::Ui)) {
     egui::Grid::new(id)
         .num_columns(2)
-        .spacing([12.0, 6.0])
+        .spacing([14.0, 8.0])
         .show(ui, content);
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    ui.label(RichText::new(text).color(ui.style().visuals.weak_text_color()));
+    ui.label(RichText::new(text).color(theme::muted_text_color(ui.ctx())));
+}
+
+/// `egui::TextEdit::singleline` is a builder, not a widget — wrap with this so
+/// every field in the form gets the same surface treatment without needing to
+/// hand-thread `desired_width` everywhere.
+fn field(value: &mut String) -> egui::TextEdit<'_> {
+    egui::TextEdit::singleline(value)
 }
 
 fn describe_report(toasts: &mut ToastList, report: &crate::server::RestartReport) {

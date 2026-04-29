@@ -2,6 +2,18 @@
 
 All notable changes are recorded here. MailBox Ultra follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-04-29
+
+The polish release on top of 1.0.0 — visual refinements, faithful responsive HTML preview, a much richer simulator, and native-only documentation throughout.
+
+- **Inbox sidebar** redesigned: two-line rows, relative timestamps ("now / 2m ago / 1h ago / 3d ago"), ellipsis-truncated From + Subject, narrower default width. Hover lifts to a soft accent bar; selection gets the full accent left edge plus a tinted fill.
+- **Settings dialog** flattened: section headings with thin underlines instead of nested bordered cards, primary buttons filled with the brand accent, focus ring softened to a subtle 1px border instead of the previous accent glow.
+- **Theme** rebuilt around an explicit four-step surface hierarchy (`BG → BG_ELEV → BG_ELEV2 → BG_SOFT`) with helper functions for body/muted/dim text and surface levels, so consumers don't repeat the dark/light branch.
+- **HTML preview — Mobile / iPad device buttons now also swap the WKWebView's User-Agent** to match iOS Mail / iPad Mail. Width + UA together give a faithful preview for any responsive email that branches on either; the page reloads in place when the device changes.
+- **Simulator (`scripts/simulate.py`)** got six "MARÉ" ecommerce templates (welcome, new collection drop, order confirmation, cart abandonment, flash sale, lookbook) with real Unsplash imagery, a wordmark rendered as inline-styled text, and `<style>` `@media (max-width:540px)` rules that genuinely stack columns and shrink padding on the Mobile (390px) preview. Plus eight everyday email scenarios in the visual style of their senders: Linear issue assigned, GitHub PR review request, Figma comment, Google Doc comment, Substack newsletter, Stripe payment received, Google Calendar 15-minute reminder, Apple App Store receipt. Default firing order is curated to look like a plausible day's inbox.
+- **Documentation site** overhauled for native-only: removed the CLI, Web UI, and HTTP API pages; rewrote Quick start / Preferences / SMTP / Relay / Logging / Comparison / Use cases / Contributing to lean on the Preferences window; new homepage hero with the screenshot above the fold.
+- **README** updated with all three new screenshots (dark inbox, light order confirmation, dark mobile preview) and pointers to the docs site.
+
 ## [1.0.0] - 2026-04-29
 
 **BREAKING CHANGE.** MailBox Ultra is now a native macOS app, not a CLI binary with a browser UI.

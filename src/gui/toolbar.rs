@@ -192,8 +192,25 @@ fn relay_button(
 }
 
 fn smtp_pill(ui: &mut egui::Ui, url: &str, toasts: &mut ToastList) {
+    // Two-pass render: first measure (to get the pill's hover state), then
+    // paint with the hover-aware fill colour so the user has a clear
+    // affordance that it's clickable.
+    let visuals = ui.style().visuals.clone();
+    let id = egui::Id::new("toolbar-smtp-pill");
+
+    // Measure first by running a dummy frame to get the size, then re-paint
+    // with hover. Simpler: pick fill upfront based on what hover state egui
+    // remembers from last frame.
+    let last_hovered = ui
+        .ctx()
+        .memory(|m| m.data.get_temp::<bool>(id).unwrap_or(false));
+    let fill = if last_hovered {
+        visuals.widgets.hovered.bg_fill
+    } else {
+        visuals.widgets.inactive.bg_fill
+    };
     let frame = egui::Frame::group(ui.style())
-        .fill(ui.style().visuals.widgets.inactive.bg_fill)
+        .fill(fill)
         .corner_radius(egui::CornerRadius::same(14))
         .inner_margin(egui::Margin::symmetric(10, 4))
         .stroke(Stroke::NONE);
@@ -203,13 +220,19 @@ fn smtp_pill(ui: &mut egui::Ui, url: &str, toasts: &mut ToastList) {
                 ui.label(
                     RichText::new("SMTP")
                         .small()
-                        .color(ui.style().visuals.weak_text_color()),
+                        .color(visuals.weak_text_color()),
                 );
                 ui.label(RichText::new(url).monospace());
             });
         })
         .response
         .interact(Sense::click());
+
+    let hovered = response.hovered();
+    ui.ctx().memory_mut(|m| m.data.insert_temp(id, hovered));
+    if hovered {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
     if response.clicked() {
         ui.ctx().copy_text(url.to_string());
         toasts.success(format!("Copied {url}"));

@@ -203,6 +203,10 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> egui::Response {
     let visuals = ui.style().visuals.clone();
     let accent = theme::accent(ui.ctx());
 
+    if response.hovered() && !selected {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
     // Background.
     let bg = if selected {
         // Soft accent fill at low opacity.

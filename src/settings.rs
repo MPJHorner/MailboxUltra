@@ -70,8 +70,10 @@ pub struct RelaySettings {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Theme {
-    #[default]
     System,
+    /// Default — matches the web UI's dark-by-default design and reads better
+    /// against the colourful HTML emails users land on first.
+    #[default]
     Dark,
     Light,
 }
@@ -211,7 +213,7 @@ mod tests {
         assert!(s.auth.is_none());
         assert!(s.relay.is_none());
         assert!(s.log_file.is_none());
-        assert_eq!(s.theme, Theme::System);
+        assert_eq!(s.theme, Theme::Dark);
     }
 
     #[test]
@@ -327,7 +329,7 @@ mod tests {
         assert!(s.auth.is_none());
         assert!(s.relay.is_none());
         assert!(s.log_file.is_none());
-        assert_eq!(s.theme, Theme::System);
+        assert_eq!(s.theme, Theme::Dark);
     }
 
     #[test]

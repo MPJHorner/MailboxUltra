@@ -109,6 +109,13 @@ impl MailboxApp {
         let limit = store.capacity();
         self.list_snapshot = store.list(limit);
 
+        // Clear orphan selection (selected message was deleted or cleared).
+        if let Some(id) = self.inbox.selected_id {
+            if !self.list_snapshot.iter().any(|m| m.id == id) {
+                self.inbox.selected_id = None;
+            }
+        }
+
         // Auto-select the newest message when nothing's selected. Mirrors the
         // "click the inbox, see the latest message" behaviour Mac mail apps
         // have, and means new captured mail is immediately readable without

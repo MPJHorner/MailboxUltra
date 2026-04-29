@@ -366,12 +366,8 @@ fn tab_button(
     });
     let badge_pad_x = 6.0;
     let badge_pad_y = 1.0;
-    let badge_outer = badge_size.map(|s| {
-        egui::vec2(
-            (s.x + badge_pad_x * 2.0).max(18.0),
-            s.y + badge_pad_y * 2.0,
-        )
-    });
+    let badge_outer = badge_size
+        .map(|s| egui::vec2((s.x + badge_pad_x * 2.0).max(18.0), s.y + badge_pad_y * 2.0));
     let inner_gap = if badge_outer.is_some() { 6.0 } else { 0.0 };
 
     let total_w = label_size.x + inner_gap + badge_outer.map(|s| s.x).unwrap_or(0.0);

@@ -46,11 +46,21 @@ pub fn apply(ctx: &egui::Context, theme: Theme) {
     // Type ramp tuned for SF Pro at standard macOS rendering. Values
     // chosen to match the original web UI: body ~14px, small ~12px.
     use TextStyle::{Body, Button, Heading, Monospace, Small};
-    style.text_styles.insert(Heading, FontId::new(22.0, FontFamily::Proportional));
-    style.text_styles.insert(Body, FontId::new(14.0, FontFamily::Proportional));
-    style.text_styles.insert(Button, FontId::new(13.5, FontFamily::Proportional));
-    style.text_styles.insert(Small, FontId::new(12.0, FontFamily::Proportional));
-    style.text_styles.insert(Monospace, FontId::new(13.0, FontFamily::Monospace));
+    style
+        .text_styles
+        .insert(Heading, FontId::new(22.0, FontFamily::Proportional));
+    style
+        .text_styles
+        .insert(Body, FontId::new(14.0, FontFamily::Proportional));
+    style
+        .text_styles
+        .insert(Button, FontId::new(13.5, FontFamily::Proportional));
+    style
+        .text_styles
+        .insert(Small, FontId::new(12.0, FontFamily::Proportional));
+    style
+        .text_styles
+        .insert(Monospace, FontId::new(13.0, FontFamily::Monospace));
 
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 6.0);

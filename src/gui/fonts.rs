@@ -35,9 +35,10 @@ pub fn install(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 
     if let Some(bytes) = first_readable(PROPORTIONAL_PATHS) {
-        fonts
-            .font_data
-            .insert(PROPORTIONAL.to_owned(), Arc::new(FontData::from_owned(bytes)));
+        fonts.font_data.insert(
+            PROPORTIONAL.to_owned(),
+            Arc::new(FontData::from_owned(bytes)),
+        );
         fonts
             .families
             .entry(FontFamily::Proportional)

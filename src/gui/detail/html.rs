@@ -175,14 +175,18 @@ pub fn render(ui: &mut egui::Ui, state: &mut HtmlState, m: &Message, ctx: &mut D
                 .inner_margin(egui::Margin::symmetric(24, 8))
                 .show(ui, |ui| {
                     ui.label(
-                        RichText::new("Native HTML rendering is unavailable on this build. Showing source.")
-                            .small()
-                            .color(ui.style().visuals.weak_text_color()),
+                        RichText::new(
+                            "Native HTML rendering is unavailable on this build. Showing source.",
+                        )
+                        .small()
+                        .color(ui.style().visuals.weak_text_color()),
                     );
                     ui.add_space(6.0);
-                    egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                        render_source(ui, html);
-                    });
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false; 2])
+                        .show(ui, |ui| {
+                            render_source(ui, html);
+                        });
                 });
         }
         HtmlSubTab::Source => {
@@ -213,7 +217,11 @@ fn device_chip(ui: &mut egui::Ui, state: &mut HtmlState, device: DeviceSize) {
     let label_galley = ui.painter().layout_no_wrap(
         label_text.to_string(),
         egui::TextStyle::Button.resolve(ui.style()),
-        if active { accent } else { visuals.text_color().gamma_multiply(0.85) },
+        if active {
+            accent
+        } else {
+            visuals.text_color().gamma_multiply(0.85)
+        },
     );
     let dim_galley = ui.painter().layout_no_wrap(
         dim_text.to_string(),
@@ -256,10 +264,7 @@ fn device_chip(ui: &mut egui::Ui, state: &mut HtmlState, device: DeviceSize) {
         egui::StrokeKind::Inside,
     );
 
-    let label_pos = egui::pos2(
-        rect.left() + pad_x,
-        rect.center().y - label_size.y / 2.0,
-    );
+    let label_pos = egui::pos2(rect.left() + pad_x, rect.center().y - label_size.y / 2.0);
     ui.painter().galley(label_pos, label_galley, accent);
 
     let dim_left = label_pos.x + label_size.x + inner_gap;

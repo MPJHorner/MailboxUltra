@@ -18,6 +18,10 @@ layout: home
     </a>
   </div>
 
+  <div class="hero-oneliner">
+    <code>curl -sSL https://raw.githubusercontent.com/MPJHorner/MailboxUltra/main/scripts/install.sh | bash</code>
+  </div>
+
   <div class="hero-meta">
     <span><strong>macOS 11+</strong> · universal binary, ~10 MB</span>
     <span><strong>System WebKit</strong> for HTML rendering</span>
@@ -130,9 +134,9 @@ layout: home
   <div class="section-eyebrow">Get started</div>
   <h2>Install in 30 seconds.</h2>
 
-  <p>Grab the universal <code>.dmg</code> from the <a href="https://github.com/MPJHorner/MailboxUltra/releases/latest">latest release</a>, drag <strong>MailBox Ultra.app</strong> into <code>/Applications</code>, and right-click → Open on first launch so Gatekeeper lets the unsigned build through.</p>
+<div class="code-block"><span class="code-lang">sh</span><button class="copy-btn" type="button" aria-label="Copy code">copy</button><pre><code class="language-sh">curl -sSL https://raw.githubusercontent.com/MPJHorner/MailboxUltra/main/scripts/install.sh | bash</code></pre></div>
 
-  <p>Building from source? <code>git clone</code>, then <code>make app</code> produces a Mac bundle for the host arch; <code>make app-universal</code> for both. <a href="{{base}}/install/">Full install guide →</a></p>
+  <p>Detects your arch, downloads the matching <code>.dmg</code> from the latest release, drops <strong>MailBox Ultra.app</strong> into <code>/Applications</code>, and clears the Gatekeeper quarantine flag. <a href="{{base}}/install/">Full install guide → manual download, build-from-source, code-signing, uninstall</a></p>
 
   <div class="cta-card">
     <div>

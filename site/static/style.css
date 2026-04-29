@@ -320,7 +320,25 @@ code, pre { font-family: var(--mono); font-size: 0.93em; }
   max-width: 720px;
   margin: 0 auto 24px;
 }
-.hero-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+.hero-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.hero-oneliner {
+  max-width: 720px;
+  margin: 0 auto 24px;
+  padding: 12px 16px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  overflow-x: auto;
+}
+.hero-oneliner code {
+  font-family: var(--mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 0.82rem;
+  color: var(--text);
+  white-space: nowrap;
+  background: none;
+  padding: 0;
+}
 .btn {
   display: inline-flex;
   align-items: center;

@@ -10,7 +10,23 @@ MailBox Ultra ships as a native macOS application bundle (`.app`) packaged insid
 
 > **Requires macOS 11 (Big Sur) or newer.** Windows and Linux builds are not produced.
 
-## Recommended — download the .dmg
+## 🚀 One-line install
+
+```sh
+curl -sSL https://raw.githubusercontent.com/MPJHorner/MailboxUltra/main/scripts/install.sh | bash
+```
+
+The script detects your arch (`arm64` or `x86_64`), downloads the matching `.dmg` from the latest release, mounts it, copies **MailBox Ultra.app** into `/Applications`, ejects the DMG, and clears the Gatekeeper quarantine flag so first launch doesn't need a right-click. Override the destination with `MBU_INSTALL_DIR=~/Applications curl … | bash` if you don't want it system-wide.
+
+After it finishes:
+
+```sh
+open '/Applications/MailBox Ultra.app'    # or Spotlight → "MailBox Ultra"
+```
+
+## Manual — download the .dmg
+
+If you'd rather not pipe a script, do it by hand:
 
 1. Go to the [latest release](https://github.com/MPJHorner/MailboxUltra/releases/latest).
 2. Download `MailBoxUltra-{{version}}-universal.dmg` (or the per-arch DMG if you prefer).

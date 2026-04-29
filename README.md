@@ -20,19 +20,15 @@ Pointing your dev environment at a real SMTP relay is overkill, and a SaaS sandb
 
 ## Install
 
-> ### macOS — drag-to-install
+> ### 🚀 macOS — one line
 >
-> 1. Download `MailBoxUltra-<version>-universal.dmg` from the [latest release](https://github.com/MPJHorner/MailboxUltra/releases/latest).
-> 2. Mount the DMG, drag **MailBox Ultra.app** into `/Applications`.
-> 3. First launch: right-click the app, choose **Open** (one-time Gatekeeper prompt).
+> ```sh
+> curl -sSL https://raw.githubusercontent.com/MPJHorner/MailboxUltra/main/scripts/install.sh | bash
+> ```
+>
+> Detects your arch, grabs the matching `.dmg` from the latest release, drops `MailBox Ultra.app` into `/Applications`, and clears the Gatekeeper quarantine flag. That's it — launch it from Spotlight or `open /Applications/MailBox\ Ultra.app`.
 
-If you'd rather skip the right-click:
-
-```sh
-xattr -d com.apple.quarantine /Applications/MailBox\ Ultra.app
-```
-
-The full install guide (build-from-source, code-signing hooks, uninstall) is on the [install page](https://mpjhorner.github.io/MailboxUltra/install/).
+Prefer the manual route? Download the `.dmg` from the [latest release](https://github.com/MPJHorner/MailboxUltra/releases/latest), drag **MailBox Ultra.app** into `/Applications`, right-click → Open on first launch. Build-from-source, code-signing, and uninstall instructions are on the [install page](https://mpjhorner.github.io/MailboxUltra/install/).
 
 ## Quick start
 

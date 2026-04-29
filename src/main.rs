@@ -1,14 +1,46 @@
 //! MailBox Ultra entry point.
 //!
-//! Exempt from coverage: this file is the eframe boot shim plus the tokio
-//! runtime spawn, neither of which can be deterministically driven from a unit
-//! test runner. The orchestration logic lives in `crate::server` and is fully
-//! tested.
+//! Owns:
+//! - the tokio runtime that powers the SMTP server, the relay task, and the
+//!   log writer task;
+//! - eframe's native window;
+//! - the wiring between [`ServerHandle`] and [`MailboxApp`].
+//!
+//! Exempt from coverage. `ServerHandle` (server.rs) and the GUI modules
+//! (gui/) are tested independently; nothing here can be deterministically
+//! driven from a unit-test runner.
+
+use std::process::ExitCode;
 
 use eframe::egui;
 
-fn main() -> eframe::Result<()> {
+use mailbox_ultra::{gui::MailboxApp, server::ServerHandle, settings::PersistentSettings};
+
+fn main() -> ExitCode {
     init_tracing();
+
+    let settings = PersistentSettings::load();
+
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("error: failed to start tokio runtime: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let server = match ServerHandle::start(runtime.handle().clone(), settings.clone()) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error starting servers: {e:#}");
+            // We could still launch the GUI in a degraded state; for now we
+            // fail fast so the user sees the binding error.
+            return ExitCode::FAILURE;
+        }
+    };
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -19,25 +51,30 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    eframe::run_native(
+    // Hold a runtime guard active during the eframe event loop so background
+    // tasks (smtp server, relay, log writer) keep running. The guard is
+    // dropped after run_native returns, which aborts every spawned task and
+    // releases the listener cleanly.
+    let _enter = runtime.enter();
+    let server_for_app = server.clone();
+    let result = eframe::run_native(
         "MailBox Ultra",
         options,
-        Box::new(|_cc| Ok(Box::new(StubApp))),
-    )
-}
+        Box::new(move |cc| {
+            let app = MailboxApp::new(server_for_app.clone(), cc.egui_ctx.clone());
+            Ok(Box::new(app))
+        }),
+    );
 
-struct StubApp;
+    server.shutdown();
+    drop(runtime);
 
-impl eframe::App for StubApp {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.add_space(48.0);
-                ui.heading("MailBox Ultra");
-                ui.add_space(12.0);
-                ui.label("Native macOS app — under construction.");
-            });
-        });
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("eframe error: {e:#}");
+            ExitCode::FAILURE
+        }
     }
 }
 

@@ -5,6 +5,7 @@
 //! GUI. The GUI itself lives in `src/main.rs` + `src/gui/` and is not part of
 //! the library API.
 
+pub mod gui;
 pub mod message;
 pub mod relay;
 pub mod server;

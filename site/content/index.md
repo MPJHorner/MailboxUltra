@@ -50,7 +50,7 @@ layout: home
     </div>
     <div class="feature">
       <h3><span class="feature-icon">{ }</span> Smart formatters</h3>
-      <p>Sandboxed HTML preview, plain-text, header table, attachment downloads, raw RFC 822 source — every angle you'd want.</p>
+      <p>Sandboxed HTML preview with Desktop / iPad / Mobile size switching, plain-text, header table, attachment downloads, raw RFC 822 source — every angle you'd want.</p>
     </div>
     <div class="feature">
       <h3><span class="feature-icon">▶</span> Release</h3>

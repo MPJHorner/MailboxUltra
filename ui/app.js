@@ -18,6 +18,7 @@
     paused: false,
     filter: '',
     activeTab: 'html',
+    previewDevice: 'desktop',
     relay: { enabled: false, url: null },
   };
 
@@ -145,16 +146,62 @@
     $('#t-headers-meta').textContent = m.headers.length;
     $('#t-att-meta').textContent = m.attachments.length || '';
 
-    // HTML pane: sandboxed iframe with no allow-scripts, served from a Blob.
+    // HTML pane: device-size toolbar + sandboxed iframe served from a Blob.
     const paneHtml = $('#pane-html');
     paneHtml.replaceChildren();
     if (m.html) {
+      const devices = [
+        { id: 'desktop', label: 'Desktop', dim: 'full',
+          icon: 'M2 2h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9v1h2v1H5v-1h2v-1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm0 1v8h12V3H2Z' },
+        { id: 'tablet',  label: 'iPad',    dim: '820',
+          icon: 'M4 1h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H4Zm3 11h2v1H7v-1Z' },
+        { id: 'mobile',  label: 'Mobile',  dim: '390',
+          icon: 'M5 1h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H5Zm2 11h2v1H7v-1Z' },
+      ];
+      const bar = document.createElement('div');
+      bar.className = 'device-bar';
+      const SVG = 'http://www.w3.org/2000/svg';
+      devices.forEach((d) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'device-btn' + (d.id === state.previewDevice ? ' active' : '');
+        btn.dataset.device = d.id;
+        const svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('width', '13');
+        svg.setAttribute('height', '13');
+        svg.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS(SVG, 'path');
+        path.setAttribute('fill', 'currentColor');
+        path.setAttribute('d', d.icon);
+        svg.appendChild(path);
+        const lbl = document.createElement('span');
+        lbl.textContent = d.label;
+        const dim = document.createElement('span');
+        dim.className = 'device-dim';
+        dim.textContent = d.dim;
+        btn.appendChild(svg);
+        btn.appendChild(lbl);
+        btn.appendChild(dim);
+        bar.appendChild(btn);
+      });
+      const stage = document.createElement('div');
+      stage.className = 'iframe-stage device-' + state.previewDevice;
       const ifr = document.createElement('iframe');
       ifr.setAttribute('sandbox', 'allow-popups');
       ifr.setAttribute('referrerpolicy', 'no-referrer');
       const blob = new Blob([m.html], { type: 'text/html' });
       ifr.src = URL.createObjectURL(blob);
-      paneHtml.appendChild(ifr);
+      stage.appendChild(ifr);
+      paneHtml.appendChild(bar);
+      paneHtml.appendChild(stage);
+      bar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.device-btn');
+        if (!btn) return;
+        state.previewDevice = btn.dataset.device;
+        bar.querySelectorAll('.device-btn').forEach((b) => b.classList.toggle('active', b.dataset.device === state.previewDevice));
+        stage.className = 'iframe-stage device-' + state.previewDevice;
+      });
     } else {
       const div = document.createElement('div');
       div.className = 'pane-empty';

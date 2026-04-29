@@ -18,7 +18,7 @@ Open `http://127.0.0.1:8025` once `mailbox-ultra` is running. The UI is rendered
 
 | Tab | Shows |
 |---|---|
-| **HTML** | Sandboxed iframe rendering of the HTML body. No script execution, no parent-document access. |
+| **HTML** | Sandboxed iframe rendering of the HTML body. No script execution, no parent-document access. Device-size preview switcher (Desktop / iPad 820 / Mobile 390) sits above the frame, and the frame fills the available height. |
 | **Text** | Plain-text alternative if present, raw text of the body otherwise. |
 | **Headers** | Every header in the order it arrived, including duplicates. |
 | **Attachments** | One row per part with content type, size, and a one-click download. |
@@ -54,6 +54,18 @@ While paused, the SSE stream keeps draining in the background but new messages d
 ## Search
 
 The search box matches against subject, parsed and envelope `from`/`to` addresses. It runs against the in-memory list — no server round-trip — so it stays instant even with thousands of messages.
+
+## Device preview
+
+The HTML tab includes a row of three buttons above the rendered iframe:
+
+| Button | Width | Use |
+|---|---|---|
+| **Desktop** | full | Edge-to-edge preview, the way most clients render at full window. |
+| **iPad** | 820 px | Centered frame at tablet width, with a soft drop-shadow around the device. |
+| **Mobile** | 390 px | iPhone-class width. Hits the `@media` breakpoints in well-built responsive emails. |
+
+The iframe fills the available height of the detail pane regardless of which size you pick, so long emails scroll inside the frame rather than the surrounding chrome. Your selection is remembered as you click between captured messages.
 
 ## Sandboxing
 

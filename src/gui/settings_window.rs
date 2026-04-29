@@ -170,7 +170,7 @@ pub fn render(
         .open(&mut keep_open)
         .resizable(false)
         .collapsible(false)
-        .default_size([520.0, 0.0])
+        .default_size([560.0, 0.0])
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             let Some(buffer) = state.buffer.as_mut() else {

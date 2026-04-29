@@ -36,14 +36,24 @@ pub fn render(ctx: &egui::Context, state: &mut HelpWindowState) {
                         });
                     }
                 });
-            ui.add_space(8.0);
-            ui.label(
-                RichText::new(
-                    "Modifier keys (⌘ / Ctrl / Alt) are never intercepted, so ⌘C still copies and ⌘R still reloads.",
-                )
-                .small()
-                .color(ui.style().visuals.weak_text_color()),
-            );
+            ui.add_space(10.0);
+            egui::Frame::group(ui.style())
+                .fill(ui.style().visuals.faint_bg_color)
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    ui.style().visuals.widgets.noninteractive.bg_stroke.color,
+                ))
+                .corner_radius(egui::CornerRadius::same(6))
+                .inner_margin(egui::Margin::symmetric(12, 8))
+                .show(ui, |ui| {
+                    ui.label(
+                        RichText::new(
+                            "Modifier keys (⌘ / Ctrl / Alt) are never intercepted — ⌘C still copies and ⌘W still closes the window.",
+                        )
+                        .small()
+                        .color(ui.style().visuals.weak_text_color()),
+                    );
+                });
         });
     if !keep_open {
         state.open = false;

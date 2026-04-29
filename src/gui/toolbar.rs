@@ -15,6 +15,8 @@ pub struct ToolbarContext<'a> {
     pub theme: &'a mut Theme,
     pub toasts: &'a mut ToastList,
     pub focus_search: bool,
+    pub relay_active: bool,
+    pub relay_label: Option<&'a str>,
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -27,26 +29,30 @@ pub struct ToolbarOutput {
 
 pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     let mut out = ToolbarOutput::default();
+    let accent = theme::accent(ui.ctx());
 
     ui.horizontal_centered(|ui| {
-        ui.add_space(4.0);
-        // Brand
-        ui.label(RichText::new("✉").size(18.0).color(theme::accent(ui.ctx())));
-        ui.label(RichText::new("MailBox").strong());
+        ui.add_space(8.0);
+        // Brand mark + name + version.
+        ui.label(RichText::new("✉").size(18.0).color(accent));
+        ui.label(RichText::new("MailBox").strong().size(15.0));
+        ui.label(RichText::new("Ultra").strong().size(15.0).color(accent));
+        ui.add_space(2.0);
         ui.label(
-            RichText::new("Ultra")
-                .strong()
-                .color(theme::accent(ui.ctx())),
+            RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                .small()
+                .monospace()
+                .color(ui.style().visuals.weak_text_color()),
         );
 
-        ui.add_space(12.0);
+        ui.add_space(14.0);
         smtp_pill(ui, tctx.smtp_url, tctx.toasts);
 
         ui.add_space(12.0);
         let search = ui.add(
             egui::TextEdit::singleline(tctx.search_query)
-                .hint_text("Filter from / to / subject…")
-                .desired_width(220.0),
+                .hint_text("Filter from / to / subject  (/)")
+                .desired_width(260.0),
         );
         if tctx.focus_search {
             search.request_focus();
@@ -60,12 +66,9 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             {
                 out.clear_clicked = true;
             }
+            ui.add_space(2.0);
             if ui
-                .button(if matches!(tctx.theme, Theme::Light) {
-                    "🌙"
-                } else {
-                    "☀"
-                })
+                .button(theme_icon(*tctx.theme))
                 .on_hover_text("Toggle theme (T)")
                 .clicked()
             {
@@ -81,6 +84,7 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             {
                 out.help_clicked = true;
             }
+            ui.add_space(2.0);
             let pause_label = if *tctx.paused {
                 "▶ Resume"
             } else {
@@ -93,13 +97,10 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             {
                 *tctx.paused = !*tctx.paused;
             }
-            if ui
-                .button("↗ Relay")
-                .on_hover_text("Configure upstream relay")
-                .clicked()
-            {
+            if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
                 out.relay_clicked = true;
             }
+            ui.add_space(6.0);
             ui.label(
                 RichText::new(format!("{} captured", tctx.message_count))
                     .color(ui.style().visuals.weak_text_color()),
@@ -108,6 +109,83 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     });
 
     out
+}
+
+fn theme_icon(theme: Theme) -> &'static str {
+    match theme {
+        Theme::System => "🖥",
+        Theme::Dark => "☀",
+        Theme::Light => "🌙",
+    }
+}
+
+/// Pill-style relay button. Off → muted text, on → accent text + matching
+/// border + soft accent fill, with the upstream host:port appended in mono.
+fn relay_button(
+    ui: &mut egui::Ui,
+    active: bool,
+    label: Option<&str>,
+    accent: egui::Color32,
+) -> egui::Response {
+    let visuals = ui.style().visuals.clone();
+    let arrow_color = if active {
+        accent
+    } else {
+        visuals.text_color().gamma_multiply(0.7)
+    };
+    let text_color = if active {
+        accent
+    } else {
+        visuals.text_color().gamma_multiply(0.85)
+    };
+    let label_galley = ui.painter().layout_no_wrap(
+        format!("Relay  {}", label.unwrap_or("off")),
+        egui::TextStyle::Button.resolve(ui.style()),
+        text_color,
+    );
+    let arrow_galley = ui.painter().layout_no_wrap(
+        "↗".to_string(),
+        egui::TextStyle::Button.resolve(ui.style()),
+        arrow_color,
+    );
+    let pad_x = 12.0;
+    let pad_y = 6.0;
+    let inner = label_galley.size().x + 6.0 + arrow_galley.size().x;
+    let total = egui::vec2(inner + pad_x * 2.0, label_galley.size().y + pad_y * 2.0);
+    let (rect, response) = ui.allocate_exact_size(total, egui::Sense::click());
+    let (fill, border) = if active {
+        (accent.gamma_multiply(0.18), accent)
+    } else if response.hovered() {
+        (
+            visuals.widgets.hovered.bg_fill,
+            visuals.widgets.inactive.bg_stroke.color,
+        )
+    } else {
+        (
+            visuals.widgets.inactive.bg_fill,
+            visuals.widgets.inactive.bg_stroke.color,
+        )
+    };
+    ui.painter()
+        .rect_filled(rect, egui::CornerRadius::same(6), fill);
+    ui.painter().rect_stroke(
+        rect,
+        egui::CornerRadius::same(6),
+        egui::Stroke::new(1.0, border),
+        egui::StrokeKind::Inside,
+    );
+    let arrow_pos = egui::pos2(
+        rect.left() + pad_x,
+        rect.center().y - arrow_galley.size().y / 2.0,
+    );
+    let arrow_size = arrow_galley.size();
+    ui.painter().galley(arrow_pos, arrow_galley, arrow_color);
+    let label_pos = egui::pos2(
+        arrow_pos.x + arrow_size.x + 6.0,
+        rect.center().y - label_galley.size().y / 2.0,
+    );
+    ui.painter().galley(label_pos, label_galley, text_color);
+    response
 }
 
 fn smtp_pill(ui: &mut egui::Ui, url: &str, toasts: &mut ToastList) {

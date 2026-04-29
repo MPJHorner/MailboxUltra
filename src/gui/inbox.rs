@@ -1,9 +1,11 @@
-//! Left pane: virtualised list of captured messages.
+//! Left pane: virtualised list of captured messages, plus the
+//! waiting-for-mail empty state with a ready-to-paste swaks example.
 
 use chrono::{DateTime, Local};
 use egui::{Color32, RichText, Sense, Stroke};
 use uuid::Uuid;
 
+use crate::gui::theme;
 use crate::message::Message;
 
 const ROW_HEIGHT: f32 = 64.0;
@@ -12,6 +14,10 @@ const ROW_HEIGHT: f32 = 64.0;
 pub struct InboxState {
     pub selected_id: Option<Uuid>,
     pub search_query: String,
+    /// When `Some`, scroll the row that owns this id into view on the next
+    /// frame. Cleared after one frame so the user's manual scrolling isn't
+    /// fought by repeated auto-scrolls.
+    pub scroll_to: Option<Uuid>,
 }
 
 impl InboxState {
@@ -37,28 +43,39 @@ impl InboxState {
     }
 }
 
+pub struct InboxRenderContext<'a> {
+    pub paused: bool,
+    pub smtp_url: &'a str,
+    pub on_copy_swaks: &'a mut Option<String>,
+}
+
 pub fn render(
     ui: &mut egui::Ui,
     inbox: &mut InboxState,
     snapshot: &[Message],
-    paused: bool,
+    rctx: InboxRenderContext<'_>,
 ) -> InboxAction {
     let filtered: Vec<&Message> = snapshot.iter().filter(|m| inbox.matches(m)).collect();
 
     if filtered.is_empty() {
-        return draw_empty_state(ui, snapshot.is_empty(), paused);
+        return draw_empty_state(ui, snapshot.is_empty(), rctx);
     }
 
     let mut action = InboxAction::None;
+    let scroll_target = inbox.scroll_to.take();
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
         .show_rows(ui, ROW_HEIGHT, filtered.len(), |ui, range| {
             for idx in range {
                 let m = filtered[idx];
                 let selected = inbox.selected_id == Some(m.id);
-                if draw_row(ui, m, selected) {
+                let response = draw_row(ui, m, selected);
+                if response.clicked() {
                     inbox.selected_id = Some(m.id);
                     action = InboxAction::Selected(m.id);
+                }
+                if scroll_target == Some(m.id) {
+                    response.scroll_to_me(Some(egui::Align::Center));
                 }
             }
         });
@@ -72,10 +89,25 @@ pub enum InboxAction {
     Selected(Uuid),
 }
 
-fn draw_empty_state(ui: &mut egui::Ui, no_messages: bool, paused: bool) -> InboxAction {
-    ui.vertical_centered(|ui| {
-        ui.add_space(48.0);
-        if paused {
+fn draw_empty_state(
+    ui: &mut egui::Ui,
+    no_messages: bool,
+    rctx: InboxRenderContext<'_>,
+) -> InboxAction {
+    if !no_messages {
+        ui.vertical_centered(|ui| {
+            ui.add_space(48.0);
+            ui.label(
+                RichText::new("No messages match your search")
+                    .color(ui.style().visuals.weak_text_color()),
+            );
+        });
+        return InboxAction::None;
+    }
+
+    if rctx.paused {
+        ui.vertical_centered(|ui| {
+            ui.add_space(48.0);
             ui.label(
                 RichText::new("Capture display paused")
                     .color(Color32::from_rgb(180, 180, 180))
@@ -86,58 +118,129 @@ fn draw_empty_state(ui: &mut egui::Ui, no_messages: bool, paused: bool) -> Inbox
                 RichText::new("Press P or click Resume to continue")
                     .color(Color32::from_rgb(140, 140, 140)),
             );
-        } else if no_messages {
-            ui.label(
-                RichText::new("Waiting for mail")
-                    .color(Color32::from_rgb(180, 180, 180))
-                    .size(18.0),
-            );
-            ui.add_space(8.0);
-            ui.label(
-                RichText::new("Send anything to the SMTP port and it'll show up here.")
-                    .color(Color32::from_rgb(140, 140, 140)),
-            );
-        } else {
-            ui.label(
-                RichText::new("No messages match your search")
-                    .color(Color32::from_rgb(180, 180, 180)),
-            );
+        });
+        return InboxAction::None;
+    }
+
+    let host_port = rctx
+        .smtp_url
+        .strip_prefix("smtp://")
+        .unwrap_or(rctx.smtp_url);
+    let snippet = format!(
+        "swaks --to dev@example.com --from app@example.com \\\n  --server {host_port} \\\n  --header \"Subject: Hello from MailBoxUltra\" \\\n  --body \"It works.\""
+    );
+
+    ui.vertical_centered(|ui| {
+        ui.add_space(36.0);
+        draw_envelope_art(ui);
+        ui.add_space(14.0);
+        ui.label(
+            RichText::new("Waiting for mail")
+                .size(20.0)
+                .color(ui.style().visuals.text_color()),
+        );
+        ui.add_space(4.0);
+        ui.label(
+            RichText::new("Send anything to the SMTP port and it'll show up here.")
+                .color(ui.style().visuals.weak_text_color()),
+        );
+        ui.add_space(14.0);
+        let max_w = ui.available_width().min(420.0);
+        ui.allocate_ui_with_layout(
+            egui::vec2(max_w, 0.0),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                egui::Frame::group(ui.style())
+                    .fill(ui.style().visuals.faint_bg_color)
+                    .stroke(Stroke::new(
+                        1.0,
+                        ui.style().visuals.widgets.noninteractive.bg_stroke.color,
+                    ))
+                    .corner_radius(egui::CornerRadius::same(6))
+                    .inner_margin(egui::Margin::symmetric(14, 12))
+                    .show(ui, |ui| {
+                        ui.set_min_width(max_w - 30.0);
+                        ui.add(
+                            egui::Label::new(RichText::new(&snippet).monospace().size(11.5))
+                                .selectable(true)
+                                .wrap_mode(egui::TextWrapMode::Wrap),
+                        );
+                    });
+            },
+        );
+        ui.add_space(8.0);
+        if ui.button("Copy command").clicked() {
+            *rctx.on_copy_swaks = Some(snippet);
         }
     });
     InboxAction::None
 }
 
-fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> bool {
+/// Small mint-coloured envelope outline that matches the brand mark.
+fn draw_envelope_art(ui: &mut egui::Ui) {
+    let size = egui::vec2(72.0, 56.0);
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let stroke = Stroke::new(1.6, theme::accent(ui.ctx()).gamma_multiply(0.55));
+    let body = rect.shrink2(egui::vec2(2.0, 6.0));
+    let painter = ui.painter();
+    painter.rect_stroke(
+        body,
+        egui::CornerRadius::same(4),
+        stroke,
+        egui::StrokeKind::Inside,
+    );
+    let top_left = body.left_top();
+    let top_right = body.right_top();
+    let mid = egui::pos2(body.center().x, body.center().y + 2.0);
+    painter.line_segment([top_left, mid], stroke);
+    painter.line_segment([top_right, mid], stroke);
+}
+
+fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> egui::Response {
     let row_size = egui::vec2(ui.available_width(), ROW_HEIGHT);
     let (rect, response) = ui.allocate_exact_size(row_size, Sense::click());
 
     let visuals = ui.style().visuals.clone();
+    let accent = theme::accent(ui.ctx());
+
+    // Background.
     let bg = if selected {
-        visuals.selection.bg_fill
+        // Soft accent fill at low opacity.
+        accent.gamma_multiply(0.18)
     } else if response.hovered() {
         visuals.widgets.hovered.bg_fill
     } else {
         Color32::TRANSPARENT
     };
     if bg != Color32::TRANSPARENT {
-        ui.painter()
-            .rect_filled(rect, egui::CornerRadius::same(6), bg);
+        ui.painter().rect_filled(rect, egui::CornerRadius::ZERO, bg);
     }
-    // Bottom hairline separator between rows.
-    let sep_color = if selected {
-        Color32::TRANSPARENT
-    } else {
-        visuals.widgets.noninteractive.bg_stroke.color
-    };
-    ui.painter().line_segment(
-        [
-            egui::pos2(rect.left() + 8.0, rect.bottom()),
-            egui::pos2(rect.right() - 8.0, rect.bottom()),
-        ],
-        Stroke::new(0.5, sep_color),
-    );
 
-    let inner = rect.shrink2(egui::vec2(12.0, 8.0));
+    // Accent left border on the active row.
+    if selected {
+        let bar = egui::Rect::from_min_size(rect.left_top(), egui::vec2(3.0, rect.height()));
+        ui.painter()
+            .rect_filled(bar, egui::CornerRadius::ZERO, accent);
+    }
+
+    // Bottom hairline separator between rows (skipped on the active row so
+    // the accent fill reads as a contiguous block).
+    if !selected {
+        ui.painter().line_segment(
+            [
+                egui::pos2(rect.left() + 8.0, rect.bottom() - 0.5),
+                egui::pos2(rect.right() - 8.0, rect.bottom() - 0.5),
+            ],
+            Stroke::new(0.5, visuals.widgets.noninteractive.bg_stroke.color),
+        );
+    }
+
+    // Inner content.
+    let left_inset = if selected { 16.0 } else { 12.0 };
+    let inner = rect
+        .shrink2(egui::vec2(0.0, 8.0))
+        .with_min_x(rect.left() + left_inset)
+        .with_max_x(rect.right() - 12.0);
     let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(inner));
 
     let local: DateTime<Local> = m.received_at.with_timezone(&Local);
@@ -147,6 +250,16 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> bool {
         .as_ref()
         .map(|a| a.address.clone())
         .unwrap_or_else(|| m.envelope_from.clone());
+    let to =
+        m.to.first()
+            .map(|a| a.address.clone())
+            .or_else(|| m.envelope_to.first().cloned())
+            .unwrap_or_default();
+    let to_extra = if m.envelope_to.len() > 1 {
+        format!(" +{}", m.envelope_to.len() - 1)
+    } else {
+        String::new()
+    };
     let subject = m
         .subject
         .as_deref()
@@ -156,32 +269,48 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> bool {
     let attach_marker = if m.attachments.is_empty() {
         String::new()
     } else {
-        format!("  📎 {}", m.attachments.len())
+        format!("📎{}", m.attachments.len())
     };
 
-    let muted = if selected {
-        Color32::from_rgb(220, 230, 240)
-    } else {
-        visuals.weak_text_color()
-    };
     let primary = if selected {
         Color32::WHITE
     } else {
         visuals.text_color()
     };
+    let muted = visuals.weak_text_color();
+    let dim = visuals.text_color().gamma_multiply(0.78);
 
+    // Row 1: from (bold) ... time (mono small)
     child_ui.horizontal(|ui| {
-        ui.label(RichText::new(time).monospace().small().color(muted));
-        ui.label(RichText::new(from).color(muted).strong());
+        ui.add(egui::Label::new(RichText::new(from).color(primary).strong()).truncate());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(RichText::new(size).small().color(muted));
-            if !attach_marker.is_empty() {
-                ui.label(RichText::new(attach_marker).color(muted));
-            }
+            ui.label(RichText::new(time).monospace().small().color(muted));
         });
     });
-    child_ui.add_space(2.0);
-    child_ui.label(RichText::new(subject).color(primary).size(14.0));
+    // Row 2: subject (regular)
+    child_ui.add(
+        egui::Label::new(
+            RichText::new(format!("{subject}  {attach_marker}"))
+                .color(dim)
+                .size(13.0),
+        )
+        .truncate(),
+    );
+    // Row 3: to (small mono) ... size (small mono)
+    child_ui.horizontal(|ui| {
+        ui.add(
+            egui::Label::new(
+                RichText::new(format!("→ {to}{to_extra}"))
+                    .small()
+                    .monospace()
+                    .color(muted),
+            )
+            .truncate(),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(RichText::new(size).small().monospace().color(muted));
+        });
+    });
 
-    response.clicked()
+    response
 }

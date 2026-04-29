@@ -28,7 +28,7 @@ use crate::settings::PersistentSettings;
 
 use self::detail::{DetailContext, DetailState, DetailTab};
 use self::help_window::HelpWindowState;
-use self::inbox::{InboxAction, InboxState};
+use self::inbox::{InboxAction, InboxRenderContext, InboxState};
 use self::relay_window::RelayWindowState;
 use self::repaint::StoreSubscription;
 use self::settings_window::SettingsWindowState;
@@ -52,6 +52,7 @@ pub struct MailboxApp {
     settings_window: SettingsWindowState,
     relay_window: RelayWindowState,
     help_window: HelpWindowState,
+    confirm_clear: bool,
 
     #[cfg(target_os = "macos")]
     native_html: Option<native_html::NativeHtmlView>,
@@ -88,6 +89,7 @@ impl MailboxApp {
             settings_window: SettingsWindowState::default(),
             relay_window: RelayWindowState::default(),
             help_window: HelpWindowState::default(),
+            confirm_clear: false,
             #[cfg(target_os = "macos")]
             native_html,
         }
@@ -128,18 +130,24 @@ impl MailboxApp {
 
             if i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown) {
                 let next = current.map(|p| (p + 1).min(visible.len() - 1)).unwrap_or(0);
-                self.inbox.selected_id = visible.get(next).copied();
+                let id = visible.get(next).copied();
+                self.inbox.selected_id = id;
+                self.inbox.scroll_to = id;
             }
             if i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp) {
                 let prev = current.map(|p| p.saturating_sub(1)).unwrap_or(0);
-                self.inbox.selected_id = visible.get(prev).copied();
+                let id = visible.get(prev).copied();
+                self.inbox.selected_id = id;
+                self.inbox.scroll_to = id;
             }
             if i.key_pressed(Key::G) {
-                if i.modifiers.shift {
-                    self.inbox.selected_id = visible.last().copied();
+                let id = if i.modifiers.shift {
+                    visible.last().copied()
                 } else {
-                    self.inbox.selected_id = visible.first().copied();
-                }
+                    visible.first().copied()
+                };
+                self.inbox.selected_id = id;
+                self.inbox.scroll_to = id;
             }
             if i.key_pressed(Key::D) {
                 if let Some(id) = self.inbox.selected_id {
@@ -203,8 +211,20 @@ impl eframe::App for MailboxApp {
         self.pending_focus_search = false;
 
         let mut tb_out = toolbar::ToolbarOutput::default();
+        let server_settings = self.server.settings();
+        let relay_label = server_settings.relay.as_ref().and_then(|r| {
+            url::Url::parse(&r.url).ok().and_then(|u| {
+                u.host_str().map(|h| {
+                    if let Some(p) = u.port() {
+                        format!("{h}:{p}")
+                    } else {
+                        h.to_string()
+                    }
+                })
+            })
+        });
         egui::Panel::top("toolbar")
-            .exact_size(48.0)
+            .exact_size(56.0)
             .resizable(false)
             .show_inside(ui, |ui| {
                 tb_out = toolbar::render(
@@ -217,15 +237,19 @@ impl eframe::App for MailboxApp {
                         theme: &mut self.settings.theme,
                         toasts: &mut self.toasts,
                         focus_search,
+                        relay_active: server_settings.relay.is_some(),
+                        relay_label: relay_label.as_deref(),
                     },
                 );
                 focus_search = false;
             });
 
         if tb_out.clear_clicked || clear_via_shortcut {
-            self.server.store().clear();
-            self.inbox.selected_id = None;
-            self.toasts.info("Inbox cleared");
+            if self.list_snapshot.is_empty() {
+                self.toasts.info("Inbox is already empty");
+            } else {
+                self.confirm_clear = true;
+            }
         }
         if tb_out.settings_clicked || settings_via_shortcut {
             self.settings_window.open_with(&self.server.settings());
@@ -240,15 +264,29 @@ impl eframe::App for MailboxApp {
         // Inbox + detail panes.
         let snapshot = self.list_snapshot.clone();
         let paused = self.paused;
+        let mut copy_swaks: Option<String> = None;
         egui::Panel::left("inbox")
             .default_size(380.0)
             .min_size(280.0)
             .show_inside(ui, |ui| {
-                let action = inbox::render(ui, &mut self.inbox, &snapshot, paused);
+                let action = inbox::render(
+                    ui,
+                    &mut self.inbox,
+                    &snapshot,
+                    InboxRenderContext {
+                        paused,
+                        smtp_url: &smtp_url,
+                        on_copy_swaks: &mut copy_swaks,
+                    },
+                );
                 if let InboxAction::Selected(_) = action {
                     // Inbox::render already updated `inbox.selected_id`.
                 }
             });
+        if let Some(snippet) = copy_swaks {
+            ctx.copy_text(snippet);
+            self.toasts.success("Copied swaks command");
+        }
 
         let selected = self
             .inbox
@@ -291,10 +329,59 @@ impl eframe::App for MailboxApp {
         relay_window::render(&ctx, &mut self.relay_window, &self.server, &mut self.toasts);
         help_window::render(&ctx, &mut self.help_window);
 
+        // Confirm-clear modal.
+        if self.confirm_clear {
+            let mut keep_open = true;
+            let mut confirm = false;
+            let mut cancel = false;
+            let count = self.list_snapshot.len();
+            egui::Window::new(egui::RichText::new("Clear inbox").strong())
+                .open(&mut keep_open)
+                .resizable(false)
+                .collapsible(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(&ctx, |ui| {
+                    ui.label(format!(
+                        "Discard all {count} captured message{}? This can't be undone.",
+                        if count == 1 { "" } else { "s" }
+                    ));
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        if ui.button("Cancel").clicked() {
+                            cancel = true;
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .button(
+                                    egui::RichText::new("Clear all")
+                                        .color(egui::Color32::from_rgb(248, 113, 113)),
+                                )
+                                .clicked()
+                            {
+                                confirm = true;
+                            }
+                        });
+                    });
+                });
+            if !keep_open || cancel {
+                self.confirm_clear = false;
+            }
+            if confirm {
+                self.server.store().clear();
+                self.inbox.selected_id = None;
+                self.toasts.info("Inbox cleared");
+                self.confirm_clear = false;
+            }
+        }
+
         // Hide the WKWebView while a modal is up so it doesn't float over the
         // dialog content.
         #[cfg(target_os = "macos")]
-        if self.settings_window.open || self.relay_window.open || self.help_window.open {
+        if self.settings_window.open
+            || self.relay_window.open
+            || self.help_window.open
+            || self.confirm_clear
+        {
             if let Some(view) = self.native_html.as_ref() {
                 view.set_visible(false);
             }

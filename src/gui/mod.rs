@@ -225,9 +225,16 @@ impl eframe::App for MailboxApp {
                 })
             })
         });
+        let visuals = ctx.global_style().visuals.clone();
+        let toolbar_frame = egui::Frame::default()
+            .fill(visuals.panel_fill)
+            .stroke(egui::Stroke::NONE)
+            .inner_margin(egui::Margin::ZERO)
+            .outer_margin(egui::Margin::ZERO);
         egui::Panel::top("toolbar")
             .exact_size(56.0)
             .resizable(false)
+            .frame(toolbar_frame)
             .show_inside(ui, |ui| {
                 tb_out = toolbar::render(
                     ui,
@@ -244,6 +251,15 @@ impl eframe::App for MailboxApp {
                     },
                 );
                 focus_search = false;
+                // Bottom hairline separator.
+                let r = ui.max_rect();
+                ui.painter().line_segment(
+                    [
+                        egui::pos2(r.left(), r.bottom() - 0.5),
+                        egui::pos2(r.right(), r.bottom() - 0.5),
+                    ],
+                    egui::Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color),
+                );
             });
 
         if tb_out.clear_clicked || clear_via_shortcut {
@@ -267,9 +283,14 @@ impl eframe::App for MailboxApp {
         let snapshot = self.list_snapshot.clone();
         let paused = self.paused;
         let mut copy_swaks: Option<String> = None;
+        let inbox_frame = egui::Frame::default()
+            .fill(visuals.panel_fill)
+            .stroke(egui::Stroke::NONE)
+            .inner_margin(egui::Margin::ZERO);
         egui::Panel::left("inbox")
             .default_size(380.0)
             .min_size(280.0)
+            .frame(inbox_frame)
             .show_inside(ui, |ui| {
                 let action = inbox::render(
                     ui,
@@ -284,6 +305,15 @@ impl eframe::App for MailboxApp {
                 if let InboxAction::Selected(_) = action {
                     // Inbox::render already updated `inbox.selected_id`.
                 }
+                // Right hairline separator.
+                let r = ui.max_rect();
+                ui.painter().line_segment(
+                    [
+                        egui::pos2(r.right() - 0.5, r.top()),
+                        egui::pos2(r.right() - 0.5, r.bottom()),
+                    ],
+                    egui::Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color),
+                );
             });
         if let Some(snippet) = copy_swaks {
             ctx.copy_text(snippet);
@@ -298,15 +328,23 @@ impl eframe::App for MailboxApp {
         let mut toasts = std::mem::take(&mut self.toasts);
         #[cfg(target_os = "macos")]
         let native_html = self.native_html.as_ref();
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            let mut dctx = DetailContext {
-                server: &server,
-                toasts: &mut toasts,
-                #[cfg(target_os = "macos")]
-                native_html,
-            };
-            detail::render(ui, &mut self.detail, selected.as_ref(), &mut dctx);
-        });
+        // Detail (central) pane uses the *body* fill so it sits visually
+        // below the slightly-elevated toolbar + list panels.
+        let detail_frame = egui::Frame::default()
+            .fill(visuals.window_fill)
+            .stroke(egui::Stroke::NONE)
+            .inner_margin(egui::Margin::ZERO);
+        egui::CentralPanel::default()
+            .frame(detail_frame)
+            .show_inside(ui, |ui| {
+                let mut dctx = DetailContext {
+                    server: &server,
+                    toasts: &mut toasts,
+                    #[cfg(target_os = "macos")]
+                    native_html,
+                };
+                detail::render(ui, &mut self.detail, selected.as_ref(), &mut dctx);
+            });
         self.toasts = toasts;
 
         // Hide the native HTML view if no message is selected, so it doesn't

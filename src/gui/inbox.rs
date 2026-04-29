@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::gui::theme;
 use crate::message::Message;
 
-const ROW_HEIGHT: f32 = 64.0;
+const ROW_HEIGHT: f32 = 76.0;
 
 #[derive(Default)]
 pub struct InboxState {
@@ -235,12 +235,13 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> egui::Response {
         );
     }
 
-    // Inner content.
-    let left_inset = if selected { 16.0 } else { 12.0 };
+    // Inner content. 16px left when selected (3px bar + 13px gap),
+    // 16px otherwise. 14px right padding. 10px vertical breathing room.
+    let left_inset = 16.0;
     let inner = rect
-        .shrink2(egui::vec2(0.0, 8.0))
+        .shrink2(egui::vec2(0.0, 10.0))
         .with_min_x(rect.left() + left_inset)
-        .with_max_x(rect.right() - 12.0);
+        .with_max_x(rect.right() - 14.0);
     let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(inner));
 
     let local: DateTime<Local> = m.received_at.with_timezone(&Local);
@@ -272,11 +273,10 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> egui::Response {
         format!("📎{}", m.attachments.len())
     };
 
-    let primary = if selected {
-        Color32::WHITE
-    } else {
-        visuals.text_color()
-    };
+    // Selected rows keep the regular text color — the accent-soft bg fill
+    // already provides plenty of contrast and switching to white reads as
+    // wrong on the light theme.
+    let primary = visuals.text_color();
     let muted = visuals.weak_text_color();
     let dim = visuals.text_color().gamma_multiply(0.78);
 

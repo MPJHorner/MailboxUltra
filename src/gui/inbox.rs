@@ -207,12 +207,13 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> egui::Response {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
 
-    // Background.
+    // Background. Selected rows use a soft accent fill; hover state uses the
+    // theme's hovered fill at higher opacity than egui's default so the
+    // affordance is unmistakable on a busy inbox.
     let bg = if selected {
-        // Soft accent fill at low opacity.
-        accent.gamma_multiply(0.18)
+        accent.gamma_multiply(0.20)
     } else if response.hovered() {
-        visuals.widgets.hovered.bg_fill
+        accent.gamma_multiply(0.06)
     } else {
         Color32::TRANSPARENT
     };

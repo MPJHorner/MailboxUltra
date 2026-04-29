@@ -48,7 +48,6 @@ pub struct MailboxApp {
     paused: bool,
     list_snapshot: Vec<Message>,
     pending_focus_search: bool,
-    last_applied_theme: crate::settings::Theme,
 
     settings_window: SettingsWindowState,
     relay_window: RelayWindowState,
@@ -87,7 +86,6 @@ impl MailboxApp {
             paused: false,
             list_snapshot: Vec::new(),
             pending_focus_search: false,
-            last_applied_theme: settings.theme,
             settings_window: SettingsWindowState::default(),
             relay_window: RelayWindowState::default(),
             help_window: HelpWindowState::default(),
@@ -194,11 +192,12 @@ impl MailboxApp {
         });
     }
 
-    fn apply_theme_if_changed(&mut self, ctx: &egui::Context) {
-        if self.last_applied_theme != self.settings.theme {
-            theme::apply(ctx, self.settings.theme);
-            self.last_applied_theme = self.settings.theme;
-        }
+    fn apply_theme(&self, ctx: &egui::Context) {
+        // Re-apply every frame so that switching System ↔ Dark/Light, or
+        // having the OS theme change while we're on `System`, is picked up
+        // without us tracking every dependent input. Setting visuals + style
+        // is cheap (Arc-swap of a small struct) so this isn't a hot path.
+        theme::apply(ctx, self.settings.theme);
     }
 }
 
@@ -207,7 +206,7 @@ impl eframe::App for MailboxApp {
         let ctx = ui.ctx().clone();
         self.subscription.refresh();
         self.refresh_snapshot();
-        self.apply_theme_if_changed(&ctx);
+        self.apply_theme(&ctx);
 
         // Global shortcuts that don't need text input.
         let mut clear_via_shortcut = false;

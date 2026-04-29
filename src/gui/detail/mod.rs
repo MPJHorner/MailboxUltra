@@ -1,8 +1,27 @@
 //! Right pane: detail view for the selected message.
 //!
-//! The HTML tab will be replaced in Phase 6 by a native WKWebView embedded
-//! in the eframe window; right now it falls back to the source view so the
-//! pane is fully usable.
+//! Layout:
+//!
+//! ```text
+//! ┌──────────── detail-chrome (fixed height) ────────────┐
+//! │ from-pill → to-pill   timestamp · size · AUTH       │
+//! │ Subject heading                                     │
+//! │ ─────────────                                        │
+//! │ HTML  Text  Headers 9  Attachments 2  Source  …    │
+//! └──────────────────────────────────────────────────────┘
+//! ┌──────────── body (the rest of the central panel) ───┐
+//! │                                                     │
+//! │   tab-specific content (WKWebView for HTML,         │
+//! │   ScrollArea for Text / Source / Headers / etc.)    │
+//! │                                                     │
+//! └─────────────────────────────────────────────────────┘
+//! ```
+//!
+//! The chrome region is a `Panel::top` inside the central panel so it never
+//! scrolls; each tab body manages its own scrolling. The HTML tab does NOT
+//! wrap itself in a ScrollArea — the WKWebView scrolls itself, and wrapping
+//! it in egui's ScrollArea introduces a coordinate-system mismatch that
+//! drifts the WKWebView frame upward and over the chrome.
 
 pub mod attachments;
 pub mod headers;
@@ -78,24 +97,44 @@ pub fn render(
         empty(ui);
         return;
     };
-    draw_header(ui, m);
-    ui.separator();
-    draw_tabs(ui, m, &mut state.selected_tab);
-    ui.separator();
-    egui::ScrollArea::vertical()
-        .id_salt(("detail-body", state.selected_tab))
-        .auto_shrink([false; 2])
-        .show(ui, |ui| match state.selected_tab {
-            DetailTab::Html => html::render(ui, &mut state.html, m, ctx),
-            DetailTab::Text => text::render(ui, m),
-            DetailTab::Headers => headers::render(ui, m),
-            DetailTab::Attachments => attachments::render(ui, m, ctx),
-            DetailTab::Source => source::render(ui, m),
-            DetailTab::Release => release::render(ui, &mut state.release, m, ctx),
+
+    // Fixed chrome region at the top of the central panel: header + tabs.
+    egui::Panel::top("detail-chrome")
+        .resizable(false)
+        .frame(
+            egui::Frame::default()
+                .fill(ui.style().visuals.panel_fill)
+                .inner_margin(egui::Margin {
+                    left: 24,
+                    right: 24,
+                    top: 16,
+                    bottom: 0,
+                }),
+        )
+        .show_inside(ui, |ui| {
+            draw_header(ui, m);
+            ui.add_space(12.0);
+            draw_tabs(ui, m, &mut state.selected_tab);
         });
 
-    // Hide the WKWebView whenever the HTML tab isn't the active tab. The
-    // tab body above only ever asks the view to be visible when on Html.
+    // Body fills the rest of the central panel. The content padding lives
+    // INSIDE each tab body, so the WKWebView (HTML tab) can fill edge-to-
+    // edge while the text-based tabs add their own breathing room.
+    match state.selected_tab {
+        DetailTab::Html => html::render(ui, &mut state.html, m, ctx),
+        DetailTab::Text => with_padded_scroll(ui, "text", |ui| text::render(ui, m)),
+        DetailTab::Headers => with_padded_scroll(ui, "headers", |ui| headers::render(ui, m)),
+        DetailTab::Attachments => {
+            with_padded_scroll(ui, "attachments", |ui| attachments::render(ui, m, ctx))
+        }
+        DetailTab::Source => with_padded_scroll(ui, "source", |ui| source::render(ui, m)),
+        DetailTab::Release => with_padded_scroll(ui, "release", |ui| {
+            release::render(ui, &mut state.release, m, ctx)
+        }),
+    }
+
+    // Hide the WKWebView whenever the active tab isn't HTML so it doesn't
+    // float over a different tab's content.
     #[cfg(target_os = "macos")]
     if state.selected_tab != DetailTab::Html {
         if let Some(view) = ctx.native_html {
@@ -104,13 +143,24 @@ pub fn render(
     }
 }
 
+fn with_padded_scroll(ui: &mut egui::Ui, salt: &str, content: impl FnOnce(&mut egui::Ui)) {
+    egui::ScrollArea::vertical()
+        .id_salt(salt)
+        .auto_shrink([false; 2])
+        .show(ui, |ui| {
+            egui::Frame::default()
+                .inner_margin(egui::Margin::symmetric(24, 16))
+                .show(ui, content);
+        });
+}
+
 fn empty(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
-        ui.add_space(72.0);
+        ui.add_space(96.0);
         ui.label(
             RichText::new("Select a message to inspect")
-                .color(Color32::from_rgb(150, 150, 150))
-                .size(15.0),
+                .size(15.0)
+                .color(ui.style().visuals.weak_text_color()),
         );
     });
 }
@@ -138,9 +188,7 @@ fn draw_header(ui: &mut egui::Ui, m: &Message) {
         from_pill(ui, &from, accent);
         ui.label(RichText::new("→").color(ui.style().visuals.weak_text_color()));
         plain_pill(ui, &to_line);
-    });
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
+        ui.add_space(8.0);
         ui.label(
             RichText::new(timestamp)
                 .small()
@@ -159,12 +207,13 @@ fn draw_header(ui: &mut egui::Ui, m: &Message) {
             auth_pill(ui, accent);
         }
     });
-    ui.add_space(10.0);
+    ui.add_space(8.0);
     let subject = m.subject.as_deref().unwrap_or("(no subject)");
     ui.add(
         egui::Label::new(
             RichText::new(subject)
                 .size(22.0)
+                .strong()
                 .color(ui.style().visuals.text_color()),
         )
         .wrap_mode(egui::TextWrapMode::Wrap),
@@ -172,9 +221,8 @@ fn draw_header(ui: &mut egui::Ui, m: &Message) {
 }
 
 fn from_pill(ui: &mut egui::Ui, value: &str, accent: Color32) {
-    let bg = ui.style().visuals.faint_bg_color;
-    egui::Frame::group(ui.style())
-        .fill(bg)
+    egui::Frame::default()
+        .fill(ui.style().visuals.faint_bg_color)
         .corner_radius(egui::CornerRadius::same(255))
         .inner_margin(egui::Margin::symmetric(12, 4))
         .stroke(Stroke::new(
@@ -190,9 +238,8 @@ fn from_pill(ui: &mut egui::Ui, value: &str, accent: Color32) {
 }
 
 fn plain_pill(ui: &mut egui::Ui, value: &str) {
-    let bg = ui.style().visuals.faint_bg_color;
-    egui::Frame::group(ui.style())
-        .fill(bg)
+    egui::Frame::default()
+        .fill(ui.style().visuals.faint_bg_color)
         .corner_radius(egui::CornerRadius::same(255))
         .inner_margin(egui::Margin::symmetric(12, 4))
         .stroke(Stroke::new(
@@ -213,34 +260,42 @@ fn plain_pill(ui: &mut egui::Ui, value: &str) {
 }
 
 fn auth_pill(ui: &mut egui::Ui, accent: Color32) {
-    egui::Frame::group(ui.style())
+    egui::Frame::default()
         .fill(accent.gamma_multiply(0.18))
         .stroke(Stroke::new(1.0, accent))
         .corner_radius(egui::CornerRadius::same(255))
         .inner_margin(egui::Margin::symmetric(8, 2))
         .show(ui, |ui| {
-            ui.label(
-                RichText::new("AUTH")
-                    .color(accent)
-                    .strong()
-                    .small()
-                    .text_style(egui::TextStyle::Small),
-            );
+            ui.label(RichText::new("AUTH").color(accent).strong().small());
         });
 }
 
 fn draw_tabs(ui: &mut egui::Ui, m: &Message, selected: &mut DetailTab) {
     let accent = theme::accent(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
-        for tab in DetailTab::ALL {
-            let count = tab_meta(tab, m);
-            let active = *selected == tab;
-            if tab_button(ui, tab.label(), count, active, accent).clicked() {
-                *selected = tab;
+    let separator_color = ui.style().visuals.widgets.noninteractive.bg_stroke.color;
+
+    let response = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for tab in DetailTab::ALL {
+                let count = tab_meta(tab, m);
+                let active = *selected == tab;
+                if tab_button(ui, tab.label(), count, active, accent).clicked() {
+                    *selected = tab;
+                }
             }
-        }
-    });
+        })
+        .response;
+
+    // Bottom hairline under the entire tab strip — gives the active-tab
+    // accent underline something to sit on.
+    ui.painter().line_segment(
+        [
+            egui::pos2(response.rect.left(), response.rect.bottom()),
+            egui::pos2(response.rect.right() + 200.0, response.rect.bottom()),
+        ],
+        Stroke::new(1.0, separator_color),
+    );
 }
 
 /// One tab button: text + optional small badge + accent underline when
@@ -260,7 +315,6 @@ fn tab_button(
     };
     let badge_text = count.map(|n| n.to_string());
 
-    // Measure: label width + badge width + paddings.
     let label_galley = ui.painter().layout_no_wrap(
         label.to_string(),
         egui::TextStyle::Button.resolve(ui.style()),
@@ -268,25 +322,25 @@ fn tab_button(
     );
     let label_size = label_galley.size();
 
-    let pad_x = 12.0;
-    let pad_y = 8.0;
+    let pad_x = 14.0;
+    let pad_y = 10.0;
     let underline_h = 2.0;
 
     let badge_size = badge_text.as_ref().map(|t| {
-        let galley = ui.painter().layout_no_wrap(
-            t.clone(),
-            egui::TextStyle::Small.resolve(ui.style()),
-            visuals.weak_text_color(),
-        );
-        galley.size()
+        ui.painter()
+            .layout_no_wrap(
+                t.clone(),
+                egui::TextStyle::Small.resolve(ui.style()),
+                visuals.weak_text_color(),
+            )
+            .size()
     });
-
-    let badge_pad_x = 8.0;
-    let badge_pad_y = 2.0;
+    let badge_pad_x = 6.0;
+    let badge_pad_y = 1.0;
     let badge_outer = badge_size.map(|s| {
         egui::vec2(
-            s.x + badge_pad_x * 2.0,
-            (s.y + badge_pad_y * 2.0).max(label_size.y),
+            (s.x + badge_pad_x * 2.0).max(18.0),
+            s.y + badge_pad_y * 2.0,
         )
     });
     let inner_gap = if badge_outer.is_some() { 6.0 } else { 0.0 };
@@ -300,7 +354,7 @@ fn tab_button(
         ui.painter().rect_filled(
             rect,
             egui::CornerRadius::same(6),
-            visuals.widgets.hovered.bg_fill.gamma_multiply(0.6),
+            visuals.widgets.hovered.bg_fill.gamma_multiply(0.5),
         );
     }
 
@@ -332,8 +386,10 @@ fn tab_button(
 
     if active {
         let y = rect.bottom() - underline_h;
-        let underline_rect =
-            egui::Rect::from_min_max(egui::pos2(rect.left() + 2.0, y), rect.right_bottom());
+        let underline_rect = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + 4.0, y),
+            egui::pos2(rect.right() - 4.0, rect.bottom()),
+        );
         ui.painter()
             .rect_filled(underline_rect, egui::CornerRadius::same(2), accent);
     }

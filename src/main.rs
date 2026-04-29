@@ -49,19 +49,6 @@ fn main() -> ExitCode {
     if let Some(icon) = load_window_icon() {
         viewport = viewport.with_icon(icon);
     }
-    // macOS-native title-bar integration: the app's toolbar IS the title
-    // bar. The traffic-light buttons stay (we just inset the toolbar's
-    // left edge to make room for them); the title text itself is hidden
-    // because the toolbar already shows the brand. Content extends under
-    // the title-bar area so we don't get a 28-pixel grey strip above the
-    // toolbar.
-    #[cfg(target_os = "macos")]
-    {
-        viewport = viewport
-            .with_fullsize_content_view(true)
-            .with_titlebar_buttons_shown(true)
-            .with_title_shown(false);
-    }
     let options = eframe::NativeOptions {
         viewport,
         persist_window: true,

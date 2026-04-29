@@ -32,18 +32,11 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     let accent = theme::accent(ui.ctx());
 
     ui.horizontal_centered(|ui| {
-        // Leave room for the macOS traffic-light buttons (close / minimise /
-        // maximise) so they don't overlap the brand. ~76px is the standard
-        // width of the trio plus a small breathing buffer.
-        #[cfg(target_os = "macos")]
-        ui.add_space(78.0);
-        #[cfg(not(target_os = "macos"))]
-        ui.add_space(8.0);
-        // Brand mark + name + version.
-        ui.label(RichText::new("✉").size(18.0).color(accent));
-        ui.label(RichText::new("MailBox").strong().size(15.0));
-        ui.label(RichText::new("Ultra").strong().size(15.0).color(accent));
-        ui.add_space(2.0);
+        ui.add_space(14.0);
+
+        // Compact brand mark — the OS title bar already shows "MailBox Ultra",
+        // so the toolbar just gets a small ✉ + version label as a visual anchor.
+        ui.label(RichText::new("✉").size(16.0).color(accent));
         ui.label(
             RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
                 .small()
@@ -51,14 +44,14 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
                 .color(ui.style().visuals.weak_text_color()),
         );
 
-        ui.add_space(14.0);
+        ui.add_space(12.0);
         smtp_pill(ui, tctx.smtp_url, tctx.toasts);
 
         ui.add_space(12.0);
         let search = ui.add(
             egui::TextEdit::singleline(tctx.search_query)
                 .hint_text("Filter from / to / subject  (/)")
-                .desired_width(260.0),
+                .desired_width(280.0),
         );
         if tctx.focus_search {
             search.request_focus();

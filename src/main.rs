@@ -42,11 +42,15 @@ fn main() -> ExitCode {
         }
     };
 
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_title("MailBox Ultra")
+        .with_inner_size([1200.0, 760.0])
+        .with_min_inner_size([720.0, 480.0]);
+    if let Some(icon) = load_window_icon() {
+        viewport = viewport.with_icon(icon);
+    }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title("MailBox Ultra")
-            .with_inner_size([1200.0, 760.0])
-            .with_min_inner_size([720.0, 480.0]),
+        viewport,
         persist_window: true,
         ..Default::default()
     };
@@ -76,6 +80,20 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Load the window icon embedded in the binary at compile time. Returns
+/// `None` if the icon file isn't present (e.g. a fresh checkout that
+/// hasn't run `make icon` yet) so the build still succeeds.
+fn load_window_icon() -> Option<egui::IconData> {
+    static BYTES: &[u8] = include_bytes!("../assets/icon-512.png");
+    let img = image::load_from_memory(BYTES).ok()?.to_rgba8();
+    let (width, height) = img.dimensions();
+    Some(egui::IconData {
+        rgba: img.into_raw(),
+        width,
+        height,
+    })
 }
 
 fn init_tracing() {

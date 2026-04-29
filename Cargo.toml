@@ -1,6 +1,6 @@
 [package]
 name = "mailbox-ultra"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Local SMTP fake inbox as a native macOS app. Catch every email your app sends without ever delivering one."
@@ -19,6 +19,15 @@ path = "src/lib.rs"
 [[bin]]
 name = "mailbox-ultra"
 path = "src/main.rs"
+
+[[bin]]
+name = "icon-gen"
+path = "tools/icon-gen.rs"
+required-features = ["icon-tool"]
+
+[features]
+default = []
+icon-tool = ["dep:resvg", "dep:usvg", "dep:tiny-skia"]
 
 [dependencies]
 # Core (kept from the CLI era)
@@ -48,6 +57,12 @@ rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }
 open = "5"
 raw-window-handle = "0.6"
+
+# Optional dependencies used only by the `icon-gen` build helper. Pulled in
+# when the `icon-tool` feature is enabled.
+resvg = { version = "0.47", optional = true }
+usvg = { version = "0.47", optional = true }
+tiny-skia = { version = "0.12", optional = true }
 
 # Native macOS HTML rendering for the HTML tab.
 [target.'cfg(target_os = "macos")'.dependencies]

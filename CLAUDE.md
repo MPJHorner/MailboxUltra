@@ -29,12 +29,10 @@ Documentation-only commits do not need a version bump.
 
 ## Test coverage
 
-The project aims for high coverage on the testable surface. Four files are excluded from coverage, both locally (`make coverage`) and in CI (`codecov.yml` + the `--ignore-filename-regex` flag). Each file carries a header comment explaining its exemption; the short version:
+The project aims for high coverage on the testable surface. Two regions are excluded from coverage, both locally (`make coverage`) and in CI (`codecov.yml` + the `--ignore-filename-regex` flag). Each carries a header comment explaining its exemption:
 
-- `src/main.rs` -- binary entry point. Exercised end-to-end by the integration tests via `app::start`; re-running the bin under coverage adds noise without value.
-- `src/assets.rs` -- a single `derive(RustEmbed)` declaration. Covered implicitly by every test that serves a static asset.
-- `src/update.rs` -- the `--update` self-update flow makes real GitHub API calls. Pure logic (`parse_semver`, `is_newer`) is unit-tested directly; network paths are excluded.
-- `src/entrypoint.rs` -- top-level `run()`, signal-blocking `wait_for_shutdown`, the network update-check spawn, and `open_browser`. None of these can be deterministically driven from a unit test runner.
+- `src/main.rs` -- eframe + tokio boot shim. Cannot be deterministically driven from a unit test runner.
+- `src/gui/**` -- egui rendering code. Immediate-mode UI, no clean headless surface; the data structures it consumes (`settings`, `server`, `store`, `message`) are all tested independently.
 
 When a feature *can* be tested it must be -- exclusions are for code that physically can't be exercised, not for skipping work. If you find yourself wanting to add a file to the ignore list, justify it in that file's header comment first.
 
@@ -42,17 +40,32 @@ Run `make coverage` for a summary, `make coverage-html` for a per-line report. N
 
 ## Where things live
 
-- `src/smtp.rs` -- the SMTP listener, command parser, session state machine, and the optional relay.
-- `src/message.rs` -- the captured `Message` type and MIME parsing helpers.
+- `src/main.rs` -- eframe boot shim plus the tokio runtime spawn. Coverage-exempt.
+- `src/lib.rs` -- public module list.
+- `src/smtp.rs` -- SMTP listener, command parser, session state machine, AUTH PLAIN / LOGIN.
+- `src/message.rs` -- captured `Message` type and MIME parsing helpers.
 - `src/store.rs` -- bounded ring buffer + broadcast channel of new messages.
-- `src/ui.rs` -- the JSON API, SSE stream, attachment downloads, and `/api/relay` endpoints.
-- `src/output.rs` -- terminal printer + banner.
-- `ui/` -- the embedded vanilla-JS web UI (no build step).
-- `tests/` -- integration tests; the SMTP and UI tests share the same patterns and use `lettre` + `eventsource-client`.
+- `src/relay.rs` -- optional upstream relay task and `RelayConfig::from_url`.
+- `src/settings.rs` -- persistent `PersistentSettings` (atomic JSON load/save, schema-versioned). Replaces the old CLI flags.
+- `src/server.rs` -- `ServerHandle` lifecycle (start / restart / shutdown). Hot-updates the relay; full restart for SMTP / store changes; preserves captured messages across restarts.
+- `src/gui/` -- egui front-end. Toolbar, inbox list, detail tabs, Preferences / Relay / Help windows, toast notifications, theme. Coverage-exempt.
+  - `src/gui/native_html.rs` -- macOS-only `WKWebView` embedded in the eframe window for HTML email previews. Uses `objc2` + `objc2-web-kit`.
+- `tools/icon-gen.rs` -- small build-tool binary (feature `icon-tool`) that rasterises `icon/icon.svg` into the per-size PNGs `iconutil` expects.
+- `icon/` -- source SVG, generated `AppIcon.iconset`, generated `AppIcon.icns`. The `.icns` is committed.
+- `assets/icon-512.png` -- the runtime window icon embedded into the binary via `include_bytes!`.
+- `mac/` -- `Info.plist` template plus `build-app.sh`, `build-dmg.sh`, `build-app-universal.sh`. Hand-rolled bundling, no `cargo-bundle` dep.
+- `tests/` -- integration tests against `ServerHandle` + `PersistentSettings`. Use `lettre` and a stub upstream SMTP server.
 - `site/` -- the GitHub Pages docs site (handwritten static-site builder, deployed by `.github/workflows/site.yml`).
 
 ## Style
 
 - No em dashes, no AI-slop adjectives ("blazing-fast", "beautiful", etc.) in user-facing text.
-- README leads with the SEO-friendly description and screenshot, then links to the docs site for everything else.
+- README leads with the SEO-friendly description and screenshot, then a tight Install / Quick Start / Configuration / Shortcuts flow.
 - README badges always point at `releases/latest`, so they update automatically when a new tag ships.
+
+## macOS bundling
+
+- `make icon` regenerates `icon/AppIcon.icns` from `icon/icon.svg`. The `.icns` is committed; rerun the target only when the SVG changes.
+- `make app` produces the `.app` for the host arch. `make app-universal` produces a universal binary.
+- `make dmg` (after `make app`) packages the bundle into a `.dmg` with an `/Applications` symlink for drag-to-install.
+- Code-signing is gated on `APPLE_CERT_ID` in the environment; without it, builds are unsigned and require a right-click → Open on first launch (documented in `mac/README.md`).

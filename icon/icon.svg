@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="0.55" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#0d9488"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.30" cy="0.18" r="0.85" fx="0.30" fy="0.18">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="envelope" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ecfdf5"/>
+    </linearGradient>
+    <linearGradient id="flap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a7f3d0"/>
+      <stop offset="1" stop-color="#6ee7b7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS squircle (rounded superellipse approximated with a generous rx). -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="url(#sheen)"/>
+
+  <!-- Inner envelope, centred at (512, 528) so it visually balances under the fold. -->
+  <g transform="translate(512 528)">
+    <!-- Drop shadow plate. -->
+    <rect x="-308" y="-188" width="616" height="376" rx="36" ry="36"
+          fill="#0f766e" fill-opacity="0.32"/>
+    <!-- Envelope body. -->
+    <rect x="-300" y="-180" width="600" height="360" rx="32" ry="32"
+          fill="url(#envelope)"/>
+    <!-- Folded flap (visible "back" of the flap, lighter mint). -->
+    <path d="M -300 -180 L 300 -180 L 0 70 Z"
+          fill="url(#flap)"/>
+    <!-- Flap seam highlight: a thin emerald stroke that traces the V down to the centre. -->
+    <path d="M -300 -180 L 0 70 L 300 -180"
+          stroke="#0f766e" stroke-width="6" stroke-linejoin="round" fill="none"/>
+    <!-- Body outline for definition at small sizes. -->
+    <rect x="-300" y="-180" width="600" height="360" rx="32" ry="32"
+          fill="none" stroke="#0f766e" stroke-width="4" stroke-opacity="0.55"/>
+  </g>
+</svg>

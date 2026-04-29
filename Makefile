@@ -8,25 +8,17 @@
 CARGO ?= $(shell command -v cargo 2>/dev/null || echo $(HOME)/.cargo/bin/cargo)
 BIN   ?= mailbox-ultra
 
-# Override on the CLI: `make run SMTP_PORT=2525 UI_PORT=8888`.
-SMTP_PORT ?=
-UI_PORT   ?=
-RUN_ARGS  ?=
-
-SMTP_PORT_FLAG := $(if $(SMTP_PORT),-s $(SMTP_PORT),)
-UI_PORT_FLAG   := $(if $(UI_PORT),-u $(UI_PORT),)
-
 .PHONY: help
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 .PHONY: run
 run: ## Run in dev mode (cargo run, no release optimisations)
-	$(CARGO) run -- $(SMTP_PORT_FLAG) $(UI_PORT_FLAG) $(RUN_ARGS)
+	$(CARGO) run
 
 .PHONY: run-release
 run-release: release ## Run the release binary (faster startup)
-	./target/release/$(BIN) $(SMTP_PORT_FLAG) $(UI_PORT_FLAG) $(RUN_ARGS)
+	./target/release/$(BIN)
 
 .PHONY: build
 build: ## Debug build
@@ -62,12 +54,12 @@ lint: fmt-check clippy ## fmt-check + clippy (what CI runs)
 .PHONY: check
 check: lint test ## Lint + test -- full pre-commit gate
 
-# Files that are not testable from the lib are excluded from coverage so the
-# number reflects the testable surface, matching what Codecov ignores.
-COVERAGE_IGNORE := src/(main|assets|update|entrypoint)\.rs
+# Coverage exclusions: GUI rendering is hard to drive deterministically
+# from a unit test runner; we still cover the protocol + storage core.
+COVERAGE_IGNORE := src/(main|gui)/.*
 
 .PHONY: coverage
-coverage: ## Line coverage summary via cargo-llvm-cov (matches CI exclusions)
+coverage: ## Line coverage summary via cargo-llvm-cov
 	$(CARGO) llvm-cov --lib --tests \
 		--ignore-filename-regex='$(COVERAGE_IGNORE)' \
 		--summary-only
@@ -78,23 +70,42 @@ coverage-html: ## HTML coverage report at target/llvm-cov/html/index.html
 		--ignore-filename-regex='$(COVERAGE_IGNORE)' \
 		--html
 
-.PHONY: install
-install: ## Install the binary into ~/.cargo/bin
-	$(CARGO) install --path .
-
 .PHONY: clean
 clean: ## Remove build artifacts
 	$(CARGO) clean
 	rm -f lcov.info
 
-SMOKE_SMTP := $(or $(SMTP_PORT),1025)
-SMOKE_UI   := $(or $(UI_PORT),8025)
+# ---- macOS bundling ----
 
-.PHONY: smoke
-smoke: release ## Quick end-to-end smoke test against a fresh release binary
-	@./target/release/$(BIN) -s $(SMOKE_SMTP) -u $(SMOKE_UI) --no-cli > /tmp/mbu-smoke.log 2>&1 & echo $$! > /tmp/mbu-smoke.pid
-	@sleep 1
-	@echo "-> SMTP send via swaks/sendmail not assumed; hit the API instead"
-	@curl -sS http://127.0.0.1:$(SMOKE_UI)/api/messages | head -c 200; echo
-	@kill $$(cat /tmp/mbu-smoke.pid); rm -f /tmp/mbu-smoke.pid /tmp/mbu-smoke.log
-	@echo "smoke OK"
+.PHONY: icon
+icon: ## Rasterise icon/icon.svg, then compile icon/AppIcon.icns
+	$(CARGO) run --bin icon-gen --features icon-tool
+	iconutil -c icns icon/AppIcon.iconset -o icon/AppIcon.icns
+
+.PHONY: app
+app: ## Build MailBoxUltra.app for the host architecture
+	./mac/build-app.sh
+
+.PHONY: app-x86
+app-x86: ## Build MailBoxUltra.app for Intel Macs
+	./mac/build-app.sh x86_64-apple-darwin
+
+.PHONY: app-arm
+app-arm: ## Build MailBoxUltra.app for Apple Silicon
+	./mac/build-app.sh aarch64-apple-darwin
+
+.PHONY: app-universal
+app-universal: ## Build a universal MailBoxUltra.app (Intel + Apple Silicon)
+	./mac/build-app-universal.sh
+
+.PHONY: dmg
+dmg: ## Package the host-arch .app into a DMG
+	./mac/build-dmg.sh
+
+.PHONY: dmg-arm
+dmg-arm: ## Package the Apple Silicon .app into a DMG
+	./mac/build-dmg.sh aarch64-apple-darwin
+
+.PHONY: dmg-x86
+dmg-x86: ## Package the Intel .app into a DMG
+	./mac/build-dmg.sh x86_64-apple-darwin

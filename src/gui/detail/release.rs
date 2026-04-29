@@ -135,8 +135,7 @@ fn poll_in_flight(state: &mut ReleaseState, ctx: &mut DetailContext<'_>) {
             state.in_flight = Some(f);
         }
         Err(oneshot::error::TryRecvError::Closed) => {
-            ctx.toasts
-                .error("Release task aborted before completion");
+            ctx.toasts.error("Release task aborted before completion");
         }
     }
 }

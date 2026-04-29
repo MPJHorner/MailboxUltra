@@ -61,7 +61,7 @@ fn main() -> ExitCode {
         "MailBox Ultra",
         options,
         Box::new(move |cc| {
-            let app = MailboxApp::new(server_for_app.clone(), cc.egui_ctx.clone());
+            let app = MailboxApp::new(server_for_app.clone(), cc);
             Ok(Box::new(app))
         }),
     );

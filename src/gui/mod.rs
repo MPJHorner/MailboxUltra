@@ -7,6 +7,8 @@
 
 pub mod detail;
 pub mod inbox;
+#[cfg(target_os = "macos")]
+pub mod native_html;
 pub mod repaint;
 pub mod theme;
 pub mod toasts;
@@ -40,17 +42,28 @@ pub struct MailboxApp {
     list_snapshot: Vec<Message>,
     pending_focus_search: bool,
     last_applied_theme: crate::settings::Theme,
+
+    #[cfg(target_os = "macos")]
+    native_html: Option<native_html::NativeHtmlView>,
 }
 
 impl MailboxApp {
-    pub fn new(server: Arc<ServerHandle>, egui_ctx: egui::Context) -> Self {
+    pub fn new(server: Arc<ServerHandle>, cc: &eframe::CreationContext<'_>) -> Self {
         let settings = server.settings();
-        theme::apply(&egui_ctx, settings.theme);
+        theme::apply(&cc.egui_ctx, settings.theme);
         let subscription = StoreSubscription::new(
             server.clone(),
             tokio::runtime::Handle::current(),
-            egui_ctx.clone(),
+            cc.egui_ctx.clone(),
         );
+        #[cfg(target_os = "macos")]
+        let native_html = match native_html::NativeHtmlView::attach(cc) {
+            Some(v) => Some(v),
+            None => {
+                tracing::warn!("could not attach native HTML view; HTML tab will fall back");
+                None
+            }
+        };
         Self {
             server,
             settings: settings.clone(),
@@ -62,6 +75,8 @@ impl MailboxApp {
             list_snapshot: Vec::new(),
             pending_focus_search: false,
             last_applied_theme: settings.theme,
+            #[cfg(target_os = "macos")]
+            native_html,
         }
     }
 
@@ -119,9 +134,16 @@ impl MailboxApp {
                     self.inbox.selected_id = None;
                 }
             }
-            for (idx, key) in [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6]
-                .iter()
-                .enumerate()
+            for (idx, key) in [
+                Key::Num1,
+                Key::Num2,
+                Key::Num3,
+                Key::Num4,
+                Key::Num5,
+                Key::Num6,
+            ]
+            .iter()
+            .enumerate()
             {
                 if i.key_pressed(*key) {
                     if let Some(t) = DetailTab::ALL.get(idx).copied() {
@@ -222,14 +244,30 @@ impl eframe::App for MailboxApp {
             .and_then(|id| self.list_snapshot.iter().find(|m| m.id == id).cloned());
         let server = self.server.clone();
         let mut toasts = std::mem::take(&mut self.toasts);
+        let window_height = ctx.content_rect().height();
+        #[cfg(target_os = "macos")]
+        let native_html = self.native_html.as_ref();
         egui::CentralPanel::default().show_inside(ui, |ui| {
             let mut dctx = DetailContext {
                 server: &server,
                 toasts: &mut toasts,
+                window_height,
+                #[cfg(target_os = "macos")]
+                native_html,
             };
             detail::render(ui, &mut self.detail, selected.as_ref(), &mut dctx);
         });
         self.toasts = toasts;
+
+        // Hide the native HTML view if no message is selected, so it doesn't
+        // hang around displaying stale content while the user's on the empty
+        // detail placeholder.
+        #[cfg(target_os = "macos")]
+        if selected.is_none() {
+            if let Some(view) = self.native_html.as_ref() {
+                view.set_visible(false);
+            }
+        }
 
         // Toasts overlay last so they sit above panels.
         self.toasts.show(&ctx);

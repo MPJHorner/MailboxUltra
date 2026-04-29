@@ -71,11 +71,7 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             {
                 *tctx.theme = next_theme(*tctx.theme);
             }
-            if ui
-                .button("⚙")
-                .on_hover_text("Preferences (⌘,)")
-                .clicked()
-            {
+            if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
                 out.settings_clicked = true;
             }
             if ui
@@ -85,7 +81,11 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
             {
                 out.help_clicked = true;
             }
-            let pause_label = if *tctx.paused { "▶ Resume" } else { "⏸ Pause" };
+            let pause_label = if *tctx.paused {
+                "▶ Resume"
+            } else {
+                "⏸ Pause"
+            };
             if ui
                 .button(pause_label)
                 .on_hover_text("Pause / resume capture display (P)")

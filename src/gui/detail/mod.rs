@@ -25,6 +25,7 @@ use super::toasts::ToastList;
 pub struct DetailState {
     pub selected_tab: DetailTab,
     pub release: release::ReleaseState,
+    pub html: html::HtmlState,
 }
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -62,6 +63,9 @@ impl DetailTab {
 pub struct DetailContext<'a> {
     pub server: &'a Arc<ServerHandle>,
     pub toasts: &'a mut ToastList,
+    #[cfg(target_os = "macos")]
+    pub native_html: Option<&'a super::native_html::NativeHtmlView>,
+    pub window_height: f32,
 }
 
 pub fn render(
@@ -82,13 +86,22 @@ pub fn render(
         .id_salt(("detail-body", state.selected_tab))
         .auto_shrink([false; 2])
         .show(ui, |ui| match state.selected_tab {
-            DetailTab::Html => html::render(ui, m),
+            DetailTab::Html => html::render(ui, &mut state.html, m, ctx),
             DetailTab::Text => text::render(ui, m),
             DetailTab::Headers => headers::render(ui, m),
             DetailTab::Attachments => attachments::render(ui, m, ctx),
             DetailTab::Source => source::render(ui, m),
             DetailTab::Release => release::render(ui, &mut state.release, m, ctx),
         });
+
+    // Hide the WKWebView whenever the HTML tab isn't the active tab. The
+    // tab body above only ever asks the view to be visible when on Html.
+    #[cfg(target_os = "macos")]
+    if state.selected_tab != DetailTab::Html {
+        if let Some(view) = ctx.native_html {
+            view.set_visible(false);
+        }
+    }
 }
 
 fn empty(ui: &mut egui::Ui) {

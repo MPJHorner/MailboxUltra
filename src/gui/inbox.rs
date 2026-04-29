@@ -25,12 +25,11 @@ impl InboxState {
             .as_ref()
             .map(|a| a.address.as_str())
             .unwrap_or(m.envelope_from.as_str());
-        let to_first = m
-            .to
-            .first()
-            .map(|a| a.address.as_str())
-            .or_else(|| m.envelope_to.first().map(|s| s.as_str()))
-            .unwrap_or("");
+        let to_first =
+            m.to.first()
+                .map(|a| a.address.as_str())
+                .or_else(|| m.envelope_to.first().map(|s| s.as_str()))
+                .unwrap_or("");
         let subject = m.subject.as_deref().unwrap_or("");
         from.to_ascii_lowercase().contains(&needle)
             || to_first.to_ascii_lowercase().contains(&needle)
@@ -174,15 +173,12 @@ fn draw_row(ui: &mut egui::Ui, m: &Message, selected: bool) -> bool {
     child_ui.horizontal(|ui| {
         ui.label(RichText::new(time).monospace().small().color(muted));
         ui.label(RichText::new(from).color(muted).strong());
-        ui.with_layout(
-            egui::Layout::right_to_left(egui::Align::Center),
-            |ui| {
-                ui.label(RichText::new(size).small().color(muted));
-                if !attach_marker.is_empty() {
-                    ui.label(RichText::new(attach_marker).color(muted));
-                }
-            },
-        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(RichText::new(size).small().color(muted));
+            if !attach_marker.is_empty() {
+                ui.label(RichText::new(attach_marker).color(muted));
+            }
+        });
     });
     child_ui.add_space(2.0);
     child_ui.label(RichText::new(subject).color(primary).size(14.0));

@@ -1,9 +1,11 @@
-//! HTML tab — interim implementation.
+//! HTML tab.
 //!
-//! Phase 6 replaces this with a native WKWebView embedded in the eframe
-//! window. Until then we show the HTML source highlighted, plus the plain
-//! text part if it exists, plus an "Open in browser" escape hatch so
-//! users can still see a rendered preview.
+//! On macOS the rendered preview lives inside a real `WKWebView` embedded as
+//! a child `NSView` of the eframe window (see `gui::native_html`). egui
+//! draws the sub-tab buttons and reserves a rect; the WKWebView is
+//! repositioned to overlap that rect each frame.
+//!
+//! When the message has no HTML body, the tab falls back to plain text.
 
 use std::path::PathBuf;
 
@@ -12,8 +14,26 @@ use egui_extras::syntax_highlighting::{self, CodeTheme};
 
 use crate::message::Message;
 
-pub fn render(ui: &mut egui::Ui, m: &Message) {
+use super::DetailContext;
+
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HtmlSubTab {
+    #[default]
+    Rendered,
+    Source,
+}
+
+#[derive(Default)]
+pub struct HtmlState {
+    pub sub_tab: HtmlSubTab,
+}
+
+pub fn render(ui: &mut egui::Ui, state: &mut HtmlState, m: &Message, ctx: &mut DetailContext<'_>) {
     let Some(html) = m.html.as_ref() else {
+        #[cfg(target_os = "macos")]
+        if let Some(view) = ctx.native_html {
+            view.set_visible(false);
+        }
         if let Some(text) = &m.text {
             ui.label(
                 RichText::new("This message has no HTML part. Showing text/plain.")
@@ -30,8 +50,7 @@ pub fn render(ui: &mut egui::Ui, m: &Message) {
             );
         } else {
             ui.label(
-                RichText::new("(no text or HTML body)")
-                    .color(ui.style().visuals.weak_text_color()),
+                RichText::new("(no text or HTML body)").color(ui.style().visuals.weak_text_color()),
             );
         }
         return;
@@ -39,27 +58,69 @@ pub fn render(ui: &mut egui::Ui, m: &Message) {
 
     ui.horizontal(|ui| {
         if ui
-            .button("Open in browser")
-            .on_hover_text("Write the HTML to a temp file and hand it to the system browser")
+            .selectable_label(state.sub_tab == HtmlSubTab::Rendered, "Rendered")
             .clicked()
         {
-            match write_to_temp(m.id, html) {
-                Ok(path) => {
-                    let _ = open::that(&path);
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "failed to write HTML preview to temp");
+            state.sub_tab = HtmlSubTab::Rendered;
+        }
+        if ui
+            .selectable_label(state.sub_tab == HtmlSubTab::Source, "Source")
+            .clicked()
+        {
+            state.sub_tab = HtmlSubTab::Source;
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .button("Open in browser")
+                .on_hover_text("Write the HTML to a temp file and shell to the system browser")
+                .clicked()
+            {
+                match write_to_temp(m.id, html) {
+                    Ok(path) => {
+                        let _ = open::that(&path);
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "failed to write HTML preview to temp");
+                    }
                 }
             }
-        }
-        ui.label(
-            RichText::new("Native in-window rendering arrives in the next step.")
-                .small()
-                .color(ui.style().visuals.weak_text_color()),
-        );
+        });
     });
     ui.add_space(6.0);
 
+    match state.sub_tab {
+        HtmlSubTab::Rendered => {
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(view) = ctx.native_html {
+                    let rect = ui.available_rect_before_wrap();
+                    ui.allocate_rect(rect, egui::Sense::hover());
+                    view.set_frame(ctx.window_height, rect);
+                    view.set_visible(true);
+                    view.load(m.id, html);
+                    return;
+                }
+            }
+            ui.label(
+                RichText::new(
+                    "Native HTML rendering is unavailable on this build. Showing source.",
+                )
+                .small()
+                .color(ui.style().visuals.weak_text_color()),
+            );
+            render_source(ui, html);
+        }
+        HtmlSubTab::Source => {
+            #[cfg(target_os = "macos")]
+            if let Some(view) = ctx.native_html {
+                view.set_visible(false);
+            }
+            render_source(ui, html);
+        }
+    }
+}
+
+fn render_source(ui: &mut egui::Ui, html: &str) {
     let theme = CodeTheme::from_style(ui.style());
     syntax_highlighting::code_view_ui(ui, &theme, html, "html");
 }

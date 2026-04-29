@@ -52,9 +52,34 @@ raw-window-handle = "0.6"
 # Native macOS HTML rendering for the HTML tab.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = "0.3"
-objc2-app-kit = "0.3"
-objc2-web-kit = "0.3"
+objc2-foundation = { version = "0.3", features = [
+    "NSObject",
+    "NSString",
+    "NSURL",
+    "NSURLRequest",
+    "NSGeometry",
+    "NSValue",
+    "NSThread",
+    "objc2-core-foundation",
+] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-app-kit = { version = "0.3", features = [
+    "NSView",
+    "NSWindow",
+    "NSResponder",
+    "NSApplication",
+] }
+objc2-web-kit = { version = "0.3", features = [
+    "WKWebView",
+    "WKWebViewConfiguration",
+    "WKPreferences",
+    "WKNavigation",
+    "WKNavigationAction",
+    "WKNavigationDelegate",
+    "WKWebpagePreferences",
+    "block2",
+    "objc2-app-kit",
+] }
 block2 = "0.6"
 
 [dev-dependencies]

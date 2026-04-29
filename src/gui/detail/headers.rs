@@ -5,9 +5,7 @@ use crate::message::Message;
 
 pub fn render(ui: &mut egui::Ui, m: &Message) {
     if m.headers.is_empty() {
-        ui.label(
-            RichText::new("(no headers)").color(ui.style().visuals.weak_text_color()),
-        );
+        ui.label(RichText::new("(no headers)").color(ui.style().visuals.weak_text_color()));
         return;
     }
     let row_height = 22.0;

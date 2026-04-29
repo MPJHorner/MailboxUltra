@@ -1,16 +1,11 @@
-//! MailBox Ultra: a local SMTP fake inbox library + binary.
+//! MailBox Ultra: a native macOS SMTP fake-inbox app.
 //!
-//! All public modules are re-exported here so integration tests can drive the
-//! servers and helpers without going through the `main` shim.
+//! The library exposes the protocol + storage core (`smtp`, `store`, `relay`,
+//! `message`) so integration tests can drive it without going through the
+//! GUI. The GUI itself lives in `src/main.rs` + `src/gui/` and is not part of
+//! the library API.
 
-pub mod app;
-pub mod assets;
-pub mod cli;
-pub mod entrypoint;
 pub mod message;
-pub mod output;
 pub mod relay;
 pub mod smtp;
 pub mod store;
-pub mod ui;
-pub mod update;

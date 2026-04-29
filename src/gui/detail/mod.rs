@@ -93,11 +93,6 @@ pub fn render(
     message: Option<&Message>,
     ctx: &mut DetailContext<'_>,
 ) {
-    tracing::trace!(
-        "detail::render entry: max_rect={:?} selected={}",
-        ui.max_rect(),
-        message.is_some(),
-    );
     let Some(m) = message else {
         empty(ui);
         return;
@@ -127,12 +122,6 @@ pub fn render(
         });
 
     let chrome_rect = chrome_response.response.rect;
-    tracing::trace!(
-        "detail layout: full={:?} chrome={:?} cursor={:?}",
-        ui.max_rect(),
-        chrome_rect,
-        ui.cursor(),
-    );
 
     // Hairline below the chrome.
     let bottom_y = chrome_rect.bottom() - 0.5;

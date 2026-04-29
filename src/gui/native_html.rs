@@ -146,19 +146,6 @@ impl NativeHtmlView {
         };
         let origin = NSPoint::new(x, y);
         let size = NSSize::new(w.max(0.0), h.max(0.0));
-        tracing::trace!(
-            "wkwebview frame: egui rect=({},{})..({},{}) parent_h={} flipped={} ns rect=({},{}, {}x{})",
-            rect.left(),
-            rect.top(),
-            rect.right(),
-            rect.bottom(),
-            parent_h,
-            is_flipped,
-            x,
-            y,
-            size.width,
-            size.height,
-        );
         self.web.setFrame(NSRect::new(origin, size));
     }
 

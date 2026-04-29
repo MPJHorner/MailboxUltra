@@ -31,88 +31,84 @@ pub fn render(ui: &mut egui::Ui, tctx: ToolbarContext<'_>) -> ToolbarOutput {
     let mut out = ToolbarOutput::default();
     let accent = theme::accent(ui.ctx());
 
-    ui.horizontal_centered(|ui| {
+    // Canonical egui idiom for "left items + right items in a single row":
+    // wrap the whole row in `right_to_left`, place right items first (they
+    // stack from the right edge), then nest `left_to_right` for the left
+    // items (which fills from the left and takes whatever space remains).
+    // This is the only pattern in egui that reliably gets both sides.
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.add_space(14.0);
 
-        // Compact brand mark — the OS title bar already shows "MailBox Ultra",
-        // so the toolbar just gets a small ✉ + version label as a visual anchor.
-        ui.label(RichText::new("✉").size(16.0).color(accent));
+        // Right cluster.
+        if ui
+            .button(RichText::new("Clear").color(Color32::from_rgb(248, 113, 113)))
+            .on_hover_text("Discard every captured message (⇧⌘X)")
+            .clicked()
+        {
+            out.clear_clicked = true;
+        }
+        ui.add_space(2.0);
+        if ui
+            .button(theme_icon(*tctx.theme))
+            .on_hover_text("Toggle theme (T)")
+            .clicked()
+        {
+            *tctx.theme = next_theme(*tctx.theme);
+        }
+        if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
+            out.settings_clicked = true;
+        }
+        if ui
+            .button("?")
+            .on_hover_text("Keyboard shortcuts (?)")
+            .clicked()
+        {
+            out.help_clicked = true;
+        }
+        ui.add_space(2.0);
+        let pause_label = if *tctx.paused {
+            "▶ Resume"
+        } else {
+            "⏸ Pause"
+        };
+        if ui
+            .button(pause_label)
+            .on_hover_text("Pause / resume capture display (P)")
+            .clicked()
+        {
+            *tctx.paused = !*tctx.paused;
+        }
+        if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
+            out.relay_clicked = true;
+        }
+        ui.add_space(6.0);
         ui.label(
-            RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
-                .small()
-                .monospace()
+            RichText::new(format!("{} captured", tctx.message_count))
                 .color(ui.style().visuals.weak_text_color()),
         );
 
-        ui.add_space(12.0);
-        smtp_pill(ui, tctx.smtp_url, tctx.toasts);
-
-        ui.add_space(12.0);
-        let search = ui.add(
-            egui::TextEdit::singleline(tctx.search_query)
-                .hint_text("Filter from / to / subject  (/)")
-                .desired_width(280.0),
-        );
-        if tctx.focus_search {
-            search.request_focus();
-        }
-
-        // Claim ALL remaining horizontal space and lay out from the right
-        // edge inward — `with_layout(right_to_left, ...)` inside a horizontal
-        // ui doesn't pick up the remaining width on its own.
-        ui.allocate_ui_with_layout(
-            egui::vec2(ui.available_width(), ui.available_height()),
-            egui::Layout::right_to_left(egui::Align::Center),
-            |ui| {
-                ui.add_space(8.0);
-                if ui
-                    .button(RichText::new("Clear").color(Color32::from_rgb(248, 113, 113)))
-                    .on_hover_text("Discard every captured message (⇧⌘X)")
-                    .clicked()
-                {
-                    out.clear_clicked = true;
-                }
-                ui.add_space(2.0);
-                if ui
-                    .button(theme_icon(*tctx.theme))
-                    .on_hover_text("Toggle theme (T)")
-                    .clicked()
-                {
-                    *tctx.theme = next_theme(*tctx.theme);
-                }
-                if ui.button("⚙").on_hover_text("Preferences (⌘,)").clicked() {
-                    out.settings_clicked = true;
-                }
-                if ui
-                    .button("?")
-                    .on_hover_text("Keyboard shortcuts (?)")
-                    .clicked()
-                {
-                    out.help_clicked = true;
-                }
-                ui.add_space(2.0);
-                let pause_label = if *tctx.paused {
-                    "▶ Resume"
-                } else {
-                    "⏸ Pause"
-                };
-                if ui
-                    .button(pause_label)
-                    .on_hover_text("Pause / resume capture display (P)")
-                    .clicked()
-                {
-                    *tctx.paused = !*tctx.paused;
-                }
-                if relay_button(ui, tctx.relay_active, tctx.relay_label, accent).clicked() {
-                    out.relay_clicked = true;
-                }
-                ui.add_space(6.0);
-                ui.label(
-                    RichText::new(format!("{} captured", tctx.message_count))
-                        .color(ui.style().visuals.weak_text_color()),
-                );
-            },
-        );
+        // Left cluster (nested left_to_right takes the remaining width).
+        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.add_space(14.0);
+            ui.label(RichText::new("✉").size(16.0).color(accent));
+            ui.label(
+                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                    .small()
+                    .monospace()
+                    .color(ui.style().visuals.weak_text_color()),
+            );
+            ui.add_space(12.0);
+            smtp_pill(ui, tctx.smtp_url, tctx.toasts);
+            ui.add_space(12.0);
+            let search = ui.add(
+                egui::TextEdit::singleline(tctx.search_query)
+                    .hint_text("Filter from / to / subject  (/)")
+                    .desired_width(280.0),
+            );
+            if tctx.focus_search {
+                search.request_focus();
+            }
+        });
     });
 
     out

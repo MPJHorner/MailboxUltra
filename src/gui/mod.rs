@@ -251,6 +251,7 @@ impl eframe::App for MailboxApp {
         egui::Panel::top("toolbar")
             .exact_size(56.0)
             .resizable(false)
+            .show_separator_line(false)
             .frame(toolbar_frame)
             .show_inside(ui, |ui| {
                 tb_out = toolbar::render(
@@ -307,6 +308,7 @@ impl eframe::App for MailboxApp {
         egui::Panel::left("inbox")
             .default_size(380.0)
             .min_size(280.0)
+            .show_separator_line(false)
             .frame(inbox_frame)
             .show_inside(ui, |ui| {
                 let action = inbox::render(

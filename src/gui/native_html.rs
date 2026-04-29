@@ -19,7 +19,7 @@ use std::cell::Cell;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2::{define_class, msg_send, MainThreadOnly};
-use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
+use objc2_app_kit::{NSView, NSWindowOrderingMode};
 use objc2_core_foundation::CGFloat;
 use objc2_foundation::{
     MainThreadMarker, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
@@ -51,21 +51,25 @@ impl NativeHtmlView {
     pub fn attach(window: &impl HasWindowHandle) -> Option<Self> {
         let mtm = MainThreadMarker::new()?;
 
-        // Extract the AppKit NSView pointer from raw-window-handle.
+        // Extract the AppKit NSView pointer from raw-window-handle. This is
+        // the view that egui draws into (winit's GLView). Adding the
+        // WKWebView as a subview of THIS view guarantees that egui's screen
+        // coordinate system and the WKWebView's parent coordinate system are
+        // the same view, so the y-flip works without any extra offset
+        // accounting (which would otherwise be needed if we walked up to
+        // NSWindow.contentView and the GLView were offset within it).
         let handle = window.window_handle().ok()?;
         let ns_view_ptr = match handle.as_raw() {
             RawWindowHandle::AppKit(h) => h.ns_view,
             _ => return None,
         };
 
-        // SAFETY: raw-window-handle guarantees ns_view points to a valid
-        // NSView for the lifetime of the WindowHandle. We only dereference
-        // it here on the main thread (mtm proof) to walk to its window's
-        // contentView, and we hold no Rust references across re-entry.
+        // SAFETY: raw-window-handle guarantees the pointer is a valid NSView
+        // for the lifetime of the WindowHandle. We retain it explicitly so
+        // we can hold it past the borrow.
         let parent_view: Retained<NSView> = unsafe {
-            let ns_view: &NSView = ns_view_ptr.cast::<NSView>().as_ref();
-            let window: Retained<NSWindow> = ns_view.window()?;
-            window.contentView()?
+            let ptr: *mut NSView = ns_view_ptr.cast::<NSView>().as_ptr();
+            Retained::retain(ptr)?
         };
 
         // Configuration: disable JS. The setJavaScriptEnabled method is
@@ -127,19 +131,29 @@ impl NativeHtmlView {
     /// height and let it cover the tabs.
     pub fn set_frame(&self, rect: egui::Rect) {
         let parent_h: CGFloat = self.parent.frame().size.height;
+        let is_flipped = self.parent.isFlipped();
         let x = rect.left() as CGFloat;
         let w = rect.width() as CGFloat;
         let h = rect.height() as CGFloat;
-        let y = parent_h - rect.bottom() as CGFloat;
+        // Winit's macOS view is flipped (top-left origin, matching egui). In
+        // that case the y-axis already points down, so we just use rect.top
+        // directly. For unflipped (regular AppKit bottom-up) views we'd need
+        // the classic y_flip = parent_h - rect.bottom.
+        let y = if is_flipped {
+            rect.top() as CGFloat
+        } else {
+            parent_h - rect.bottom() as CGFloat
+        };
         let origin = NSPoint::new(x, y);
         let size = NSSize::new(w.max(0.0), h.max(0.0));
         tracing::trace!(
-            "wkwebview frame: egui rect=({},{})..({},{})  parent_h={}  ns rect=({},{}, {}x{})",
+            "wkwebview frame: egui rect=({},{})..({},{}) parent_h={} flipped={} ns rect=({},{}, {}x{})",
             rect.left(),
             rect.top(),
             rect.right(),
             rect.bottom(),
             parent_h,
+            is_flipped,
             x,
             y,
             size.width,

@@ -7,6 +7,7 @@
 
 pub mod message;
 pub mod relay;
+pub mod server;
 pub mod settings;
 pub mod smtp;
 pub mod store;

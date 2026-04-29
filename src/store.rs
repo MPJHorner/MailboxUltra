@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::message::Message;
 
-/// Events broadcast when the store changes. Used by the SSE stream and the CLI
-/// printer task.
+/// Events broadcast when the store changes. Used by the GUI repaint
+/// bridge, the optional NDJSON log writer, and the relay task.
 #[derive(Debug, Clone)]
 pub enum StoreEvent {
     Message(Box<Message>),

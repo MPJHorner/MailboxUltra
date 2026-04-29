@@ -1,32 +1,38 @@
-# MailBoxUltra -- common developer tasks.
-# Run `make help` (or just `make`) for the list.
+# MailBox Ultra — common developer tasks.
+# Run `make` (or `make help`) for the full list.
 
 .DEFAULT_GOAL := help
 
 # Resolve cargo from PATH, then fall back to the standard rustup install
 # location so `make run` works in shells that haven't sourced ~/.cargo/env.
-CARGO ?= $(shell command -v cargo 2>/dev/null || echo $(HOME)/.cargo/bin/cargo)
-BIN   ?= mailbox-ultra
+CARGO       ?= $(shell command -v cargo 2>/dev/null || echo $(HOME)/.cargo/bin/cargo)
+BIN         ?= mailbox-ultra
+HOST_TRIPLE := $(shell rustc -vV | awk '/host:/ { print $$2 }')
+HOST_APP    := target/$(HOST_TRIPLE)/release/MailBoxUltra.app
 
 .PHONY: help
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# ---- iteration ----
 
 .PHONY: run
-run: ## Run in dev mode (cargo run, no release optimisations)
+run: ## Run via cargo (debug build, no .app shell). Fastest iteration.
 	$(CARGO) run
 
-.PHONY: run-release
-run-release: release ## Run the release binary (faster startup)
-	./target/release/$(BIN)
+.PHONY: launch
+launch: app ## Build the .app and open it (the real Mac install experience)
+	open $(HOST_APP)
 
 .PHONY: build
 build: ## Debug build
 	$(CARGO) build
 
 .PHONY: release
-release: ## Optimised release build
+release: ## Optimised release build (bare binary, no .app)
 	$(CARGO) build --release
+
+# ---- gates ----
 
 .PHONY: test
 test: ## Run unit + integration tests
@@ -52,10 +58,10 @@ clippy: ## Run clippy with -D warnings
 lint: fmt-check clippy ## fmt-check + clippy (what CI runs)
 
 .PHONY: check
-check: lint test ## Lint + test -- full pre-commit gate
+check: lint test ## Lint + test — full pre-commit gate
 
-# Coverage exclusions: GUI rendering is hard to drive deterministically
-# from a unit test runner; we still cover the protocol + storage core.
+# Coverage exclusions: GUI rendering is hard to drive deterministically from
+# a unit test runner; we still cover the protocol + storage + lifecycle core.
 COVERAGE_IGNORE := src/(main|gui)/.*
 
 .PHONY: coverage
@@ -71,44 +77,52 @@ coverage-html: ## HTML coverage report at target/llvm-cov/html/index.html
 		--html
 
 .PHONY: clean
-clean: ## Remove build artifacts
+clean: ## Remove build artifacts (preserves icon/AppIcon.icns)
 	$(CARGO) clean
 	rm -f lcov.info
 
 # ---- macOS bundling ----
 
-.PHONY: icon
-icon: ## Rasterise icon/icon.svg, then compile icon/AppIcon.icns
+# File-target so `make icon` is a no-op when icon.svg hasn't changed.
+icon/AppIcon.icns: icon/icon.svg
 	$(CARGO) run --bin icon-gen --features icon-tool
-	iconutil -c icns icon/AppIcon.iconset -o icon/AppIcon.icns
+	iconutil -c icns icon/AppIcon.iconset -o $@
+
+.PHONY: icon
+icon: icon/AppIcon.icns ## Rasterise icon/icon.svg → icon/AppIcon.icns (incremental)
 
 .PHONY: app
-app: ## Build MailBoxUltra.app for the host architecture
+app: icon/AppIcon.icns ## Build MailBoxUltra.app for the host architecture
 	./mac/build-app.sh
 
-.PHONY: app-x86
-app-x86: ## Build MailBoxUltra.app for Intel Macs
-	./mac/build-app.sh x86_64-apple-darwin
-
 .PHONY: app-arm
-app-arm: ## Build MailBoxUltra.app for Apple Silicon
+app-arm: icon/AppIcon.icns ## Build MailBoxUltra.app for Apple Silicon
 	./mac/build-app.sh aarch64-apple-darwin
 
+.PHONY: app-x86
+app-x86: icon/AppIcon.icns ## Build MailBoxUltra.app for Intel Macs
+	./mac/build-app.sh x86_64-apple-darwin
+
 .PHONY: app-universal
-app-universal: ## Build a universal MailBoxUltra.app (Intel + Apple Silicon)
+app-universal: icon/AppIcon.icns ## Universal MailBoxUltra.app (Intel + Apple Silicon)
 	./mac/build-app-universal.sh
 
 .PHONY: dmg
-dmg: ## Package the host-arch .app into a DMG
+dmg: app ## Package the host-arch .app into a DMG (auto-builds .app if needed)
 	./mac/build-dmg.sh
 
 .PHONY: dmg-arm
-dmg-arm: ## Package the Apple Silicon .app into a DMG
+dmg-arm: app-arm ## Package the Apple Silicon .app into a DMG
 	./mac/build-dmg.sh aarch64-apple-darwin
 
 .PHONY: dmg-x86
-dmg-x86: ## Package the Intel .app into a DMG
+dmg-x86: app-x86 ## Package the Intel .app into a DMG
 	./mac/build-dmg.sh x86_64-apple-darwin
+
+.PHONY: dmg-universal
+dmg-universal: app-universal ## Universal DMG (Intel + Apple Silicon, signed if APPLE_CERT_ID is set)
+	@echo "(universal DMG is produced by build-app-universal.sh in $(dir $(HOST_APP)).." \
+	  "/universal-apple-darwin/release/)"
 
 # ---- dev: simulate inbound mail ----
 
